@@ -1,0 +1,6 @@
+{
+  "name": "CineVault Download Hub",
+  "description": "A production-ready Movie Download Platform with a powerful Admin CMS, built with React, Vite, and Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
