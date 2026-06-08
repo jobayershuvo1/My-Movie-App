@@ -42,6 +42,38 @@ export default function Logs() {
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [showSqlInstructions, setShowSqlInstructions] = useState(false);
+
+  const handleClearLogs = async () => {
+    if (!supabase) return;
+    if (!window.confirm('Are you sure you want to clear all system logs? This action is irreversible.')) return;
+    setLoading(true);
+    try {
+      const { error, count } = await supabase
+        .from('activity_logs')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+        .select();
+      
+      if (error) throw error;
+      
+      if (!count || count === 0) {
+        // If count is 0 but we know there are logs, it's an RLS issue
+        if (logs.length > 0) {
+           setShowSqlInstructions(true);
+        }
+      } else {
+        setLogs([]);
+      }
+    } catch (err: any) {
+      console.error('Failed to clear logs:', err);
+      // Fallback instruction
+      if (logs.length > 0) setShowSqlInstructions(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchLogs = async () => {
     if (!supabase) return;
     setLoading(true);
@@ -148,6 +180,60 @@ export default function Logs() {
 
   return (
     <div className="space-y-6">
+      {/* SQL Instruction Modal for RLS */}
+      {showSqlInstructions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowSqlInstructions(false)}></div>
+          <div className="bg-zinc-950 border border-red-500/30 rounded-2xl p-6 shadow-2xl relative w-full max-w-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Database Permissions Required</h3>
+            <p className="text-zinc-400 text-sm mb-4">
+              To prevent accidental data loss, the ability to permanently clear logs and requests is blocked by Row Level Security (RLS) by default. To unlock this ability, please run the following standard SQL policy patch in your Supabase SQL Editor:
+            </p>
+            <div className="bg-black border border-white/10 rounded-xl p-4 overflow-x-auto relative group">
+              <pre className="text-xs text-zinc-300 font-mono text-left whitespace-pre-wrap leading-relaxed">
+{`-- Add DELETE policies so admins can clear logs and requests
+
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins can delete activity logs" ON public.activity_logs;
+CREATE POLICY "Admins can delete activity logs" 
+  ON public.activity_logs FOR DELETE 
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE profiles.id = auth.uid() 
+      AND role IN ('super_admin', 'admin')
+    )
+  );
+
+ALTER TABLE public.movie_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins can delete requests" ON public.movie_requests;
+CREATE POLICY "Admins can delete requests" 
+  ON public.movie_requests FOR DELETE 
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE profiles.id = auth.uid() 
+      AND role IN ('super_admin', 'admin')
+    )
+  );`}
+              </pre>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setShowSqlInstructions(false)}
+                className="px-5 py-2.5 bg-white text-black font-bold text-sm rounded-xl hover:bg-zinc-200 transition-colors cursor-pointer"
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header and Controls */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -159,14 +245,24 @@ export default function Logs() {
           </p>
         </div>
         
-        <button 
-          onClick={fetchLogs}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-850 text-xs text-zinc-200 font-bold rounded-xl border border-white/5 transition-all self-start md:self-auto cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh Audit Logs
-        </button>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <button 
+            onClick={handleClearLogs}
+            disabled={loading || logs.length === 0}
+            className="flex items-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold rounded-xl border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Clear Logs
+          </button>
+          <button 
+            onClick={fetchLogs}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-850 text-xs text-zinc-200 font-bold rounded-xl border border-white/5 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh Audit Logs
+          </button>
+        </div>
       </div>
 
       {/* Activity Filter bar */}
@@ -224,7 +320,7 @@ export default function Logs() {
         
         {/* Logs Feed Column */}
         <div className="lg:col-span-3 glass rounded-2xl border border-white/5 overflow-hidden flex flex-col justify-between">
-          <div className="overflow-x-auto w-full">
+          <div className="overflow-x-auto w-full hidden lg:block">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-white/5 border-b border-white/5 text-[10px] uppercase tracking-wider font-mono text-zinc-500">
@@ -315,6 +411,72 @@ export default function Logs() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Logs View */}
+          <div className="lg:hidden space-y-4 p-4">
+            {loading ? (
+              [1, 2, 3].map((_, index) => (
+                <div key={index} className="p-4 bg-zinc-950 border border-white/5 rounded-xl space-y-3 animate-pulse">
+                  <div className="h-4 bg-zinc-800 rounded w-24"></div>
+                  <div className="h-4 bg-zinc-800 rounded w-full"></div>
+                  <div className="h-4 bg-zinc-850 rounded w-28"></div>
+                </div>
+              ))
+            ) : filteredLogs.length > 0 ? (
+              filteredLogs.map(log => (
+                <div 
+                  key={log.id} 
+                  className={`p-4 bg-zinc-950 border rounded-xl space-y-3 relative card-hover overflow-hidden transition-all ${
+                    selectedMetaLog?.id === log.id ? 'border-red-500/50 bg-white/5' : 'border-white/5'
+                  }`}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-bold border uppercase tracking-wider ${getLogBadgeColors(log.action)}`}>
+                      {getLogIcon(log.action)}
+                      {log.action.replace('_', ' ')}
+                    </span>
+                    <button
+                      onClick={() => setSelectedMetaLog(selectedMetaLog?.id === log.id ? null : log)}
+                      className={`p-1.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                        selectedMetaLog?.id === log.id 
+                          ? 'bg-red-650 text-white border-red-500' 
+                          : 'bg-zinc-900 border-white/5 text-zinc-400 hover:text-white'
+                      }`}
+                      title="View XML Dump / Inspector"
+                    >
+                      <Code className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  
+                  <p className="text-zinc-200 text-sm font-medium leading-relaxed">{log.details}</p>
+
+                  <div className="pt-3 border-t border-white/5 flex items-center justify-between flex-wrap gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                       <UserPlus className="w-3.5 h-3.5 text-zinc-600" />
+                       <div className="flex flex-col">
+                         <span className="text-white font-bold">{log.profiles?.full_name || 'Anonymous'}</span>
+                         {log.profiles?.email && <span className="text-zinc-500 font-mono text-[9px]">{log.profiles.email}</span>}
+                       </div>
+                    </div>
+                    
+                    <div className="text-right">
+                       <span className="flex items-center justify-end gap-1 font-mono text-zinc-400">
+                          <Calendar className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                          {new Date(log.created_at).toLocaleTimeString() || 'Just now'}
+                       </span>
+                       <span className="block text-[8.5px] text-zinc-600 font-mono mt-0.5">
+                          {new Date(log.created_at).toLocaleDateString()}
+                       </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+                <div className="text-center py-10 text-sm text-zinc-500">
+                  No matching logs trace found.
+                </div>
+            )}
           </div>
 
           <div className="p-4 bg-white/[0.01] border-t border-white/5 px-6 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-zinc-500 gap-2">

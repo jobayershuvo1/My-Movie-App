@@ -77,14 +77,57 @@ export default function Register() {
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-8">
+      
+      {error?.includes('Database error saving new user') && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setError(null)}></div>
+          <div className="bg-zinc-950 border border-red-500/30 rounded-2xl p-6 shadow-2xl relative w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-white mb-2 text-red-500">Database Trigger Error Detected!</h3>
+            <p className="text-zinc-400 text-sm mb-4">
+              Your Supabase <code>on_auth_user_created</code> trigger failed to insert the user profile because of missing schema path declarations or variable missing issues. To fix this immediately so users can sign up, please run the following SQL patch in your Supabase SQL Editor:
+            </p>
+            <div className="bg-black border border-white/10 rounded-xl p-4 overflow-x-auto relative group">
+              <pre className="text-xs text-zinc-300 font-mono text-left whitespace-pre-wrap leading-relaxed">
+{`-- Fix Auth Trigger for User Signup
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, role)
+  VALUES (
+    new.id, 
+    new.email, 
+    new.raw_user_meta_data->>'full_name',
+    CASE 
+      WHEN new.email = 'jobayershuvo1122@gmail.com' THEN 'super_admin'::public.user_role
+      ELSE 'user'::public.user_role
+    END
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;`}
+              </pre>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setError(null)}
+                className="px-5 py-2.5 bg-white text-black font-bold text-sm rounded-xl hover:bg-zinc-200 transition-colors cursor-pointer"
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="w-full max-w-2xl space-y-8 relative z-10">
         <div className="text-center">
           <h2 className="text-2xl font-bold tracking-tight text-white mb-2">Create Account</h2>
           <p className="text-sm text-zinc-400">Join CineVault to request movies and access premium links.</p>
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-4 glass p-6 rounded-2xl">
-          {error && (
+        <form onSubmit={handleRegister} className="space-y-4 glass p-6 rounded-2xl max-w-sm mx-auto">
+          {error && !error.includes('Database error saving new user') && (
             <div className="p-3 text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg">
               {error}
             </div>

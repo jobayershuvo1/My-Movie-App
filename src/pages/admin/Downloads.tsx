@@ -38,6 +38,7 @@ export default function Downloads() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [notesInput, setNotesInput] = useState<{ [id: string]: string }>({});
+  const [showSqlInstructions, setShowSqlInstructions] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; requestId: string | null; requestTitle: string }>({
     isOpen: false,
     requestId: null,
@@ -159,6 +160,34 @@ export default function Downloads() {
     });
   };
 
+  const handleClearAllRequests = async () => {
+    if (!supabase) return;
+    if (!window.confirm("Are you sure you want to clear all movie requests? This action is irreversible and will delete all user requests.")) return;
+    
+    try {
+      setLoading(true);
+      const { error, count } = await supabase
+        .from('movie_requests')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all efficiently
+        .select();
+        
+      if (error) throw error;
+      
+      if (!count || count === 0) {
+        if (requests.length > 0) setShowSqlInstructions(true);
+      } else {
+        setRequests([]);
+      }
+    } catch (err: any) {
+      console.error('Failed to clear requests:', err);
+      // Fallback
+      if (requests.length > 0) setShowSqlInstructions(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredRequests = requests.filter(req => {
     const matchesSearch = 
       req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -179,20 +208,85 @@ export default function Downloads() {
 
   return (
     <div className="space-y-6">
+      {/* SQL Instruction Modal for RLS */}
+      {showSqlInstructions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowSqlInstructions(false)}></div>
+          <div className="bg-zinc-950 border border-red-500/30 rounded-2xl p-6 shadow-2xl relative w-full max-w-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Database Permissions Required</h3>
+            <p className="text-zinc-400 text-sm mb-4">
+              To prevent accidental data loss, the ability to permanently clear logs and requests is blocked by Row Level Security (RLS) by default. To unlock this ability, please run the following standard SQL policy patch in your Supabase SQL Editor:
+            </p>
+            <div className="bg-black border border-white/10 rounded-xl p-4 overflow-x-auto relative group">
+              <pre className="text-xs text-zinc-300 font-mono text-left whitespace-pre-wrap leading-relaxed">
+{`-- Add DELETE policies so admins can clear logs and requests
+
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins can delete activity logs" ON public.activity_logs;
+CREATE POLICY "Admins can delete activity logs" 
+  ON public.activity_logs FOR DELETE 
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE profiles.id = auth.uid() 
+      AND role IN ('super_admin', 'admin')
+    )
+  );
+
+ALTER TABLE public.movie_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins can delete requests" ON public.movie_requests;
+CREATE POLICY "Admins can delete requests" 
+  ON public.movie_requests FOR DELETE 
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE profiles.id = auth.uid() 
+      AND role IN ('super_admin', 'admin')
+    )
+  );`}
+              </pre>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setShowSqlInstructions(false)}
+                className="px-5 py-2.5 bg-white text-black font-bold text-sm rounded-xl hover:bg-zinc-200 transition-colors cursor-pointer"
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-white mb-1">Movie Request Center</h2>
           <p className="text-sm text-zinc-400">Streamline user suggestions, track pending licenses, and publish status updates.</p>
         </div>
-        <Button 
-          variant="secondary" 
-          onClick={fetchRequests} 
-          className="flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-          disabled={loading}
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh Registry
-        </Button>
+        <div className="flex gap-2 self-start sm:self-auto">
+          <Button 
+            variant="danger" 
+            onClick={handleClearAllRequests} 
+            className="flex items-center gap-1.5 cursor-pointer font-bold"
+            disabled={loading || requests.length === 0}
+          >
+            <XCircle className={`w-4 h-4`} />
+            Clear Requests
+          </Button>
+          <Button 
+            variant="secondary" 
+            onClick={fetchRequests} 
+            className="flex items-center gap-1.5 cursor-pointer"
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh Registry
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}

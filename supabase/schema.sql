@@ -112,18 +112,20 @@ CREATE TRIGGER update_movies_updated_at
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, role)
+  INSERT INTO public.profiles (id, email, full_name, avatar_url, role)
   VALUES (
     new.id, 
     new.email, 
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'avatar_url',
     CASE 
-      WHEN new.email = 'jobayershuvo1122@gmail.com' THEN 'super_admin'::user_role
-      ELSE 'user'::user_role
+      WHEN new.email = 'jobayershuvo1122@gmail.com' THEN 'super_admin'::public.user_role
+      ELSE 'user'::public.user_role
     END
   );
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -435,7 +437,7 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_profile_created_log ON public.profiles;
 CREATE TRIGGER on_profile_created_log
