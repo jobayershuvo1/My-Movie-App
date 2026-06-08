@@ -90,6 +90,23 @@ export default function Downloads() {
         .eq('id', id);
 
       if (error) throw error;
+
+      const reqInfo = requests.find(r => r.id === id);
+      
+      // Update logs in case trigger didn't work
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+           await supabase.from('activity_logs').insert([{
+             user_id: session.user.id,
+             action: 'request_status_change',
+             details: `Updated request status of "${reqInfo?.title || 'Unknown'}" to "${status}"`,
+             metadata: { request_id: id, title: reqInfo?.title, new_status: status }
+           }]);
+        }
+      } catch (logErr) {
+        console.error('Failed to log:', logErr);
+      }
       
       // Update local state in real-time
       setRequests(prev => prev.map(r => r.id === id ? { ...r, status, notes: currentNotes } : r));

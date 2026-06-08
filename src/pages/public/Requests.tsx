@@ -44,15 +44,33 @@ export default function Requests() {
     setLoading(true);
     setFeedback(null);
 
-    const { error } = await supabase.from('movie_requests').insert([{
-      user_id: profile.id,
+    // Verify session to prevent stale token RLS errors
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setFeedback({ type: 'error', message: 'Your login session is expired. Please log in again.' });
+      setLoading(false);
+      return;
+    }
+
+    const requestData = {
+      user_id: session.user.id,
       title,
       year: parseInt(year) || null,
       notes,
       status: 'pending'
-    }]);
+    };
+
+    const { error, data: insertedReq } = await supabase.from('movie_requests').insert([requestData]).select().single();
 
     if (!error) {
+      // Manually add to activity_logs to ensure it displays in the CMS logs if DB trigger fails
+      await supabase.from('activity_logs').insert([{
+        user_id: session.user.id,
+        action: 'request_created',
+        details: `Submitted movie request for "${title}"`,
+        metadata: { request_id: insertedReq?.id, title: title }
+      }]);
+
       setIsAdding(false);
       fetchRequests();
       setTitle(''); setYear(''); setNotes('');

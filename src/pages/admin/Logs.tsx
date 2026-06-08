@@ -40,9 +40,12 @@ export default function Logs() {
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [selectedMetaLog, setSelectedMetaLog] = useState<ActivityLogItem | null>(null);
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const fetchLogs = async () => {
     if (!supabase) return;
     setLoading(true);
+    setErrorMsg(null);
     try {
       const { data, error } = await supabase
         .from('activity_logs')
@@ -65,8 +68,9 @@ export default function Logs() {
 
       if (error) throw error;
       setLogs((data as any) || []);
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Could not load activity logs:', err);
+      setErrorMsg(err?.message || 'Error loading logs.');
     } finally {
       setLoading(false);
     }
@@ -208,6 +212,12 @@ export default function Logs() {
           />
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-500 font-medium p-4 rounded-xl text-sm mb-6">
+          System Error resolving logs index: {errorMsg}
+        </div>
+      )}
 
       {/* Main logs explorer and split meta pane */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

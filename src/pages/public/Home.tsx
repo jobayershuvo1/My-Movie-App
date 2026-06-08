@@ -75,14 +75,14 @@ export default function Home() {
             <img 
               src={currentHero.cover_url || currentHero.poster_url || ''} 
               alt={currentHero.title}
-              className="w-full h-full object-cover opacity-40 mix-blend-overlay transition-opacity duration-1000"
+              className="w-full h-full object-cover opacity-80 transition-opacity duration-1000"
               referrerPolicy="no-referrer"
               onError={(e) => {
                 e.currentTarget.src = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200&auto=format&fit=crop";
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/80 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/60 to-transparent"></div>
           </div>
 
           <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-center pb-12">

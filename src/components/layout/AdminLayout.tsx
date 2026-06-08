@@ -18,7 +18,7 @@ const SIDERBAR_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
   { icon: Film, label: 'Movies & Series', path: '/admin/movies' },
   { icon: LinkIcon, label: 'Link Checker', path: '/admin/links' },
-  { icon: Download, label: 'Download Control', path: '/admin/downloads' },
+  { icon: Download, label: 'Downloads & Requests', path: '/admin/downloads' },
   { icon: Activity, label: 'System Logs', path: '/admin/logs' },
   { icon: Users, label: 'Users', path: '/admin/users' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },

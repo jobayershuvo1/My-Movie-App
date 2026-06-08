@@ -9,7 +9,8 @@ import {
   Calendar, 
   Tv, 
   Link2,
-  RefreshCw 
+  RefreshCw,
+  Inbox
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
@@ -20,6 +21,7 @@ interface DashboardStats {
   downloads: number;
   storage: string;
   uptime: number;
+  requests: number;
 }
 
 interface IngestedMovie {
@@ -37,7 +39,8 @@ export default function Dashboard() {
     users: 0,
     downloads: 0,
     storage: '0 GB',
-    uptime: 100
+    uptime: 100,
+    requests: 0
   });
   const [recentMovies, setRecentMovies] = useState<IngestedMovie[]>([]);
   const [linkMetrics, setLinkMetrics] = useState({
@@ -56,6 +59,7 @@ export default function Dashboard() {
       // 1. Core aggregates
       const { count: movies } = await supabase.from('movies').select('*', { count: 'exact', head: true });
       const { count: users } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+      const { count: requests } = await supabase.from('movie_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending');
       
       // Calculate total mirror clicks
       const { data: linksData } = await supabase.from('download_links').select('clicks, status, server_name');
@@ -113,7 +117,8 @@ export default function Dashboard() {
         users: users || 0,
         downloads: totalClicks,
         storage: storageStr,
-        uptime
+        uptime,
+        requests: requests || 0
       });
 
       setLinkMetrics({
@@ -162,12 +167,26 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards (Fully adaptive layouts) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <Link to="/admin/downloads" className="glass card-hover rounded-xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden transition-all border border-amber-500/30 shadow-[0_0_15px_rgba(251,191,36,0.15)] cursor-pointer group hover:bg-amber-500/5">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs text-zinc-500 font-medium mb-1 group-hover:text-amber-400/70 transition-colors">Pending Requests</p>
+              <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-tight">{stats.requests.toLocaleString()}</h3>
+            </div>
+            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center bg-amber-400/10 text-amber-400 shrink-0`}>
+              <Inbox className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+          </div>
+          <p className="text-[10px] font-mono text-zinc-400 flex items-center gap-1 mt-4 pt-2 border-t border-white/5">
+            <Activity className="w-3 h-3" /> Awaiting moderation
+          </p>
+        </Link>
         {[
           { label: 'Total Movies', value: stats.movies.toLocaleString(), icon: Film, trend: 'Catalog items live', color: 'text-red-500', bg: 'bg-red-500/10' },
           { label: 'Total Users', value: stats.users.toLocaleString(), icon: Users, trend: 'Registered profiles', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
           { label: 'Mirror Clicks', value: stats.downloads.toLocaleString(), icon: Download, trend: 'Hits tracked', color: 'text-sky-400', bg: 'bg-sky-400/10' },
-          { label: 'Payload Storage', value: stats.storage, icon: HardDrive, trend: 'Estimated archive', color: 'text-amber-400', bg: 'bg-amber-400/10' }
+          { label: 'Payload Storage', value: stats.storage, icon: HardDrive, trend: 'Estimated archive', color: 'text-zinc-400', bg: 'bg-zinc-400/10' }
         ].map((stat, i) => (
           <div key={i} className="glass card-hover rounded-xl p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden transition-all">
             <div className="flex justify-between items-start">

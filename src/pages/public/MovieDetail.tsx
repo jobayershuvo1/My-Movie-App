@@ -641,7 +641,7 @@ export default function MovieDetail() {
           <img 
             src={movie.cover_url || movie.poster_url || ''} 
             alt={movie.title}
-            className="w-full h-full object-cover opacity-20 mix-blend-overlay"
+            className="w-full h-full object-cover opacity-30"
             referrerPolicy="no-referrer"
             onError={(e) => {
               e.currentTarget.src = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200&auto=format&fit=crop";

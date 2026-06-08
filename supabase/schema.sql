@@ -219,6 +219,36 @@ CREATE POLICY "Admins have full access to categories"
     )
   );
 
+-- 4.5 Movie Requests Policies
+ALTER TABLE movie_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public can view movie requests" 
+  ON movie_requests FOR SELECT 
+  USING (true);
+
+CREATE POLICY "Users can insert own requests" 
+  ON movie_requests FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own requests" 
+  ON movie_requests FOR UPDATE 
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own requests" 
+  ON movie_requests FOR DELETE 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins have full access to movie requests" 
+  ON movie_requests FOR ALL 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE profiles.id = auth.uid() 
+      AND role IN ('super_admin', 'admin', 'editor')
+    )
+  );
+
 -- 5. STORAGE BUCKET CONFIGURATION
 -- Insert bucket for media
 INSERT INTO storage.buckets (id, name, public) VALUES ('media', 'media', true)
