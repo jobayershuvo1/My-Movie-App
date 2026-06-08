@@ -30,27 +30,30 @@ async function scrapeMovieMedia(movieName: string): Promise<ScrapedMedia> {
   try {
     const searchUrl = `https://www.themoviedb.org/search?query=${encodeURIComponent(movieName)}`;
     const response = await fetch(searchUrl, {
+      signal: AbortSignal.timeout(4000),
       headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         "Accept-Language": "en-US,en;q=0.9"
       }
     });
 
     if (response.ok) {
-      const html = await response.text();
+      let html = await response.text();
+      html = html.slice(0, 300000); // limit regex search space
       const moviePaths = html.match(/\/movie\/\d+[^"'\s>]+/g);
       if (moviePaths && moviePaths.length > 0) {
-        const firstMoviePath = moviePaths[0];
+        const firstMoviePath = moviePaths[0].replace(/"/g, '');
         const pageUrl = `https://www.themoviedb.org${firstMoviePath}`;
         const pageResponse = await fetch(pageUrl, {
+          signal: AbortSignal.timeout(4000),
           headers: {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
           }
         });
 
         if (pageResponse.ok) {
-          const detailHtml = await pageResponse.text();
+          let detailHtml = await pageResponse.text();
+          detailHtml = detailHtml.slice(0, 500000); // limit string size
           const tmdbImages = detailHtml.match(/\/t\/p\/[^"'\s>]+/g) || [];
           const posterHashes: string[] = [];
           const backdropHashes: string[] = [];
@@ -60,7 +63,7 @@ async function scrapeMovieMedia(movieName: string): Promise<ScrapedMedia> {
             const hash = parts[parts.length - 1];
             if (!hash || !hash.endsWith(".jpg")) continue;
 
-            if (img.includes("multi_faces") || img.includes("backdrop") || img.includes("w780") || img.includes("w1000_and_h563") || img.includes("w1920")) {
+            if (img.includes("multi_faces") || img.includes("backdrop") || img.includes("w780") || img.includes("w1000")) {
               if (!backdropHashes.includes(hash)) backdropHashes.push(hash);
             } else if (img.includes("face") || img.includes("poster") || img.includes("w300") || img.includes("w600") || img.includes("w500")) {
               if (!posterHashes.includes(hash)) posterHashes.push(hash);
@@ -97,14 +100,16 @@ async function scrapeMovieMedia(movieName: string): Promise<ScrapedMedia> {
   try {
     const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(movieName + " official trailer")}`;
     const response = await fetch(searchUrl, {
+      signal: AbortSignal.timeout(4000),
       headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         "Accept-Language": "en-US,en;q=0.9"
       }
     });
 
     if (response.ok) {
-      const html = await response.text();
+      let html = await response.text();
+      html = html.slice(0, 500000); 
       const videoIdMatches = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/g);
       if (videoIdMatches && videoIdMatches.length > 0) {
         const videoId = videoIdMatches[0].replace(/"videoId":"|"/g, '');
@@ -120,7 +125,6 @@ async function scrapeMovieMedia(movieName: string): Promise<ScrapedMedia> {
     console.warn("Failed to scrape YouTube trailer:", err);
   }
 
-  // General fallbacks using beautiful high-quality imagery to avoid blank spots
   if (!posterUrl) {
     posterUrl = `https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=600&auto=format&fit=crop`;
   }

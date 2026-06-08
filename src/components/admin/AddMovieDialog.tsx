@@ -187,7 +187,13 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess, movieToEdit
         body: JSON.stringify({ movieName: aiMovieName })
       });
       
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        throw new Error(responseText.substring(0, 200) || 'Failed to parse server response.');
+      }
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch AI details.');
