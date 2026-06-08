@@ -131,49 +131,45 @@ async function scrapeMovieMedia(movieName: string): Promise<ScrapedMedia> {
   return { posterUrl, coverUrl, trailerUrl };
 }
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+const app = express();
+app.use(express.json());
 
-  app.use(express.json());
+const apiRouter = express.Router();
 
-  // API Router
-  const apiRouter = express.Router();
+// Health Check
+apiRouter.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 
-  // Health Check
-  apiRouter.get("/health", (req, res) => {
-    res.json({ status: "ok" });
+// Example API: Analytics
+apiRouter.get("/analytics", (req, res) => {
+  res.json({
+    totalMovies: 14208,
+    totalDownloads: 1200000,
+    activeUsers: 840,
   });
+});
 
-  // Example API: Analytics
-  apiRouter.get("/analytics", (req, res) => {
-    res.json({
-      totalMovies: 14208,
-      totalDownloads: 1200000,
-      activeUsers: 840,
-    });
-  });
+// AI Movie Auto-Fill Endpoint
+apiRouter.post("/movies/autofill", async (req, res) => {
+  const { movieName } = req.body;
+  if (!movieName || typeof movieName !== 'string' || !movieName.trim()) {
+    return res.status(400).json({ error: "Please provide a valid movie name." });
+  }
 
-  // AI Movie Auto-Fill Endpoint
-  apiRouter.post("/movies/autofill", async (req, res) => {
-    const { movieName } = req.body;
-    if (!movieName || typeof movieName !== 'string' || !movieName.trim()) {
-      return res.status(400).json({ error: "Please provide a valid movie name." });
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(550).json({ error: "Server error: Gemini API key is missing. Please add GEMINI_API_KEY to your settings secrets." });
     }
 
+    // Generate metadata using a robust fallback strategy to handle quotas/high demand
+    let response;
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(550).json({ error: "Server error: Gemini API key is missing. Please add GEMINI_API_KEY to your settings secrets." });
-      }
-
-      // Generate metadata using a robust fallback strategy to handle quotas/high demand
-      let response;
-      try {
-        // Step A: Use gemini-3.1-flash-lite (extremely high throughput, reliable, and skips the resource-intensive search tool)
-        response = await aiClient.models.generateContent({
-          model: "gemini-3.1-flash-lite",
-          contents: `Provide complete and accurate metadata for the movie: "${movieName}".
+      // Step A: Use gemini-3.1-flash-lite (extremely high throughput, reliable, and skips the resource-intensive search tool)
+      response = await aiClient.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: `Provide complete and accurate metadata for the movie: "${movieName}".
 You MUST find or generate the absolute real, actual poster image URL and backdrop cover image URL for this movie.
 
 Return ONLY a JSON object that matches the following schema:
@@ -196,17 +192,17 @@ CRITICAL URL RULES:
 2. If using TMDB (image.tmdb.org), the paths MUST be complete real paths ending with a file extension like ".jpg" or ".png". Do NOT output partial or guessed paths like "/gh9Zg8" without file extensions!
 3. If TMDB urls cannot be confirmed, find public high-quality movie artwork/posters from Wikipedia or Wikimedia Commons, IMDb, Unsplash, or fanart.tv. The URL MUST be a full direct link to a real image.
 4. "trailerUrl" MUST be a valid, live YouTube trailer link (e.g., "https://www.youtube.com/watch?v=...").`,
-          config: {
-            responseMimeType: "application/json",
-          }
-        });
-      } catch (liteErr: any) {
-        console.warn("gemini-3.1-flash-lite failed or rate-limited, falling back to gemini-3.5-flash:", liteErr.message || liteErr);
-        
-        // Step B: Direct fallback to gemini-3.5-flash
-        response = await aiClient.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: `Provide complete and accurate metadata for the movie: "${movieName}".
+        config: {
+          responseMimeType: "application/json",
+        }
+      });
+    } catch (liteErr: any) {
+      console.warn("gemini-3.1-flash-lite failed or rate-limited, falling back to gemini-3.5-flash:", liteErr.message || liteErr);
+      
+      // Step B: Direct fallback to gemini-3.5-flash
+      response = await aiClient.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: `Provide complete and accurate metadata for the movie: "${movieName}".
 You MUST find or generate the absolute real, actual poster image URL and backdrop cover image URL for this movie.
 
 Return ONLY a JSON object that matches the following schema:
@@ -229,45 +225,48 @@ CRITICAL URL RULES:
 2. If using TMDB (image.tmdb.org), the paths MUST be complete real paths ending with a file extension like ".jpg" or ".png".
 3. If TMDB urls cannot be confirmed, find public high-quality movie artwork/posters from Wikipedia or Wikimedia Commons, IMDb, Unsplash, or fanart.tv. The URL MUST be a full direct link to a real image.
 4. "trailerUrl" MUST be a valid, live YouTube trailer link.`,
-          config: {
-            responseMimeType: "application/json",
-          }
-        });
-      }
-
-      const text = response.text;
-      if (!text) {
-        throw new Error("Received empty response content from Gemini.");
-      }
-
-      // Parse JSON
-      let cleanJson = text.trim();
-      if (cleanJson.startsWith("```")) {
-        cleanJson = cleanJson.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```$/, "").trim();
-      }
-
-      const parsedData = JSON.parse(cleanJson);
-
-      // Perform real-time media scraping to ensure high-fidelity working URLs for poster, cover, and trailer
-      try {
-        const searchTitle = parsedData.title || movieName;
-        const media = await scrapeMovieMedia(searchTitle);
-        if (media.posterUrl) parsedData.posterUrl = media.posterUrl;
-        if (media.coverUrl) parsedData.coverUrl = media.coverUrl;
-        if (media.trailerUrl) parsedData.trailerUrl = media.trailerUrl;
-      } catch (scrapeErr) {
-        console.warn("Media scraper correction overlay failed, returning parsed Gemini values as fallback:", scrapeErr);
-      }
-
-      res.json(parsedData);
-    } catch (err: any) {
-      console.error("AI Auto-Fill route error:", err);
-      res.status(500).json({ error: err.message || "Failed to fetch movie details from Gemini." });
+        config: {
+          responseMimeType: "application/json",
+        }
+      });
     }
-  });
 
-  // Mount APIs
-  app.use("/api", apiRouter);
+    const text = response.text;
+    if (!text) {
+      throw new Error("Received empty response content from Gemini.");
+    }
+
+    // Parse JSON
+    let cleanJson = text.trim();
+    if (cleanJson.startsWith("```")) {
+      cleanJson = cleanJson.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```$/, "").trim();
+    }
+
+    const parsedData = JSON.parse(cleanJson);
+
+    // Perform real-time media scraping to ensure high-fidelity working URLs for poster, cover, and trailer
+    try {
+      const searchTitle = parsedData.title || movieName;
+      const media = await scrapeMovieMedia(searchTitle);
+      if (media.posterUrl) parsedData.posterUrl = media.posterUrl;
+      if (media.coverUrl) parsedData.coverUrl = media.coverUrl;
+      if (media.trailerUrl) parsedData.trailerUrl = media.trailerUrl;
+    } catch (scrapeErr) {
+      console.warn("Media scraper correction overlay failed, returning parsed Gemini values as fallback:", scrapeErr);
+    }
+
+    res.json(parsedData);
+  } catch (err: any) {
+    console.error("AI Auto-Fill route error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch movie details from Gemini." });
+  }
+});
+
+// Mount APIs
+app.use("/api", apiRouter);
+
+async function startServer() {
+  const PORT = 3000;
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
@@ -290,4 +289,8 @@ CRITICAL URL RULES:
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
