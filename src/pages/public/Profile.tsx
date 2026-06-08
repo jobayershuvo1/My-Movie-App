@@ -514,7 +514,7 @@ export default function Profile() {
                       {/* Left: Poster */}
                       <Link to={`/movie/${dl.movieId}`} className="flex items-center gap-4 flex-1 min-w-0">
                         {dl.posterUrl ? (
-                          <img src={dl.posterUrl} className="w-12 h-16 rounded-xl object-cover border border-white/10 shrink-0" alt="" />
+                          <img src={dl.posterUrl} className="w-12 h-16 rounded-xl object-cover border border-white/10 shrink-0" alt="" referrerPolicy="no-referrer" />
                         ) : (
                           <div className="w-12 h-16 rounded-xl bg-zinc-900 flex items-center justify-center shrink-0 border border-white/5">
                             <Film className="w-5 h-5 text-zinc-600" />
@@ -664,7 +664,7 @@ export default function Profile() {
                     <div key={item.id} className="flex items-center justify-between gap-3 bg-zinc-950/40 border border-white/5 hover:border-white/10 p-2 rounded-2xl transition-all">
                       <Link to={`/movie/${item.id}`} className="flex items-center gap-3 flex-1 min-w-0 group">
                         {item.poster_url ? (
-                          <img src={item.poster_url} className="w-9 h-12 rounded-lg object-cover shrink-0 border border-white/5" alt="" />
+                          <img src={item.poster_url} className="w-9 h-12 rounded-lg object-cover shrink-0 border border-white/5" alt="" referrerPolicy="no-referrer" />
                         ) : (
                           <div className="w-9 h-12 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0 border border-white/5">
                             <Film className="w-4 h-4 text-zinc-600" />

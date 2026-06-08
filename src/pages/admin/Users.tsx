@@ -16,6 +16,7 @@ import {
   UserMinus
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 
 interface Profile {
   id: string;
@@ -33,6 +34,12 @@ export default function Users() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
+  const [roleConfirmation, setRoleConfirmation] = useState<{ isOpen: boolean; userId: string | null; targetRole: Profile['role'] | null; userName: string }>({
+    isOpen: false,
+    userId: null,
+    targetRole: null,
+    userName: ''
+  });
 
   if (profile?.role !== 'super_admin') {
     return (
@@ -68,23 +75,9 @@ export default function Users() {
     fetchUsers();
   }, []);
 
-  const handleUpdateRole = async (userId: string, targetRole: Profile['role']) => {
+  const executeRoleUpdate = async (userId: string, targetRole: Profile['role']) => {
     if (!supabase) return;
     setError(null);
-    
-    // Safety check - do not allow demoting self unless confirmed or if it is the designated email
-    const currentUserEmail = 'jobayershuvo1122@gmail.com'; 
-    const currentProfile = users.find(u => u.id === userId);
-    
-    if (currentProfile?.email === currentUserEmail && targetRole !== 'super_admin') {
-      alert('Security Protection: Demoting the root Super Admin account is blocked to prevent lockouts!');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to change this user's role to ${targetRole.replace('_', ' ').toUpperCase()}?`)) {
-      return;
-    }
-
     try {
       const { error: updateErr } = await supabase
         .from('profiles')
@@ -99,6 +92,23 @@ export default function Users() {
       console.error('Error changing role:', err);
       setError(err.message || 'SQL execution failed. Check DB rules.');
     }
+  };
+
+  const handleUpdateRole = async (userId: string, targetRole: Profile['role']) => {
+    const currentUserEmail = 'jobayershuvo1122@gmail.com'; 
+    const currentProfile = users.find(u => u.id === userId);
+    
+    if (currentProfile?.email === currentUserEmail && targetRole !== 'super_admin') {
+      alert('Security Protection: Demoting the root Super Admin account is blocked to prevent lockouts!');
+      return;
+    }
+
+    setRoleConfirmation({
+      isOpen: true,
+      userId,
+      targetRole,
+      userName: currentProfile?.full_name || currentProfile?.email || 'this user'
+    });
   };
 
   const filteredUsers = users.filter(usr => {
@@ -403,6 +413,21 @@ export default function Users() {
           </>
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={roleConfirmation.isOpen}
+        title="Alter Account Authorization"
+        message={`Are you sure you want to change the account access role for "${roleConfirmation.userName}" to ${roleConfirmation.targetRole ? roleConfirmation.targetRole.replace('_', ' ').toUpperCase() : ''}? This takes effect instantly.`}
+        confirmText="Update Access Role"
+        cancelText="Cancel"
+        variant="warning"
+        onConfirm={() => {
+          if (roleConfirmation.userId && roleConfirmation.targetRole) {
+            executeRoleUpdate(roleConfirmation.userId, roleConfirmation.targetRole);
+          }
+        }}
+        onCancel={() => setRoleConfirmation({ isOpen: false, userId: null, targetRole: null, userName: '' })}
+      />
     </div>
   );
 }

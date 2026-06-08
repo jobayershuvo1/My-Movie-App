@@ -76,6 +76,10 @@ export default function Home() {
               src={currentHero.cover_url || currentHero.poster_url || ''} 
               alt={currentHero.title}
               className="w-full h-full object-cover opacity-40 mix-blend-overlay transition-opacity duration-1000"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.src = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200&auto=format&fit=crop";
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent"></div>
             <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/80 to-transparent"></div>
@@ -225,6 +229,10 @@ const MovieCard: React.FC<{ movie: Movie }> = ({ movie }) => {
             src={movie.poster_url} 
             alt={movie.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              e.currentTarget.src = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=600&auto=format&fit=crop";
+            }}
           />
         ) : (
           <div className="w-full h-full flex flex-col justify-center items-center p-4 text-center">

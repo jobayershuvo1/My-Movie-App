@@ -17,6 +17,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 
 interface ExtDownloadLink {
   id: string;
@@ -60,6 +61,19 @@ export default function Links() {
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const [editUrl, setEditUrl] = useState('');
   const [editStatus, setEditStatus] = useState<'active' | 'broken' | 'maintenance'>('active');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    type: 'report' | 'link' | null;
+    targetId: string | null;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: null,
+    targetId: null,
+    title: '',
+    message: ''
+  });
 
   const fetchData = async () => {
     if (!supabase) return;
@@ -169,7 +183,7 @@ export default function Links() {
   };
 
   const handleDeleteReport = async (reportId: string) => {
-    if (!supabase || !confirm('Are you sure you want to dismiss this report?')) return;
+    if (!supabase) return;
     try {
       const { error } = await supabase
         .from('download_reports')
@@ -184,7 +198,7 @@ export default function Links() {
   };
 
   const handleDeleteLink = async (linkId: string) => {
-    if (!supabase || !confirm('Are you sure you want to permanently delete this download link?')) return;
+    if (!supabase) return;
     try {
       const { error } = await supabase
         .from('download_links')
@@ -198,6 +212,26 @@ export default function Links() {
     } catch (err) {
       console.error('Error deleting link:', err);
     }
+  };
+
+  const requestDeleteReport = (reportId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      type: 'report',
+      targetId: reportId,
+      title: 'Dismiss Error/Broken Link Report',
+      message: 'Are you sure you want to permanently dismiss and remove this broken link report from the admin feed? This cannot be undone.'
+    });
+  };
+
+  const requestDeleteLink = (linkId: string, serverName: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      type: 'link',
+      targetId: linkId,
+      title: 'Delete Download Mirror Link',
+      message: `Are you sure you want to permanently delete the download link for "${serverName || 'this server'}"? All associated reports will be cleared.`
+    });
   };
 
   const startEditing = (link: ExtDownloadLink) => {
@@ -342,7 +376,7 @@ export default function Links() {
                     <Check className="w-3.5 h-3.5" /> Mark Active
                   </Button>
                   <button 
-                    onClick={() => handleDeleteReport(report.id)}
+                    onClick={() => requestDeleteReport(report.id)}
                     className="p-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
                     title="Dismiss"
                   >
@@ -490,7 +524,7 @@ export default function Links() {
                           <Settings2 className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDeleteLink(link.id)} 
+                          onClick={() => requestDeleteLink(link.id, link.server_name)} 
                           className="p-1.5 text-rose-500 hover:text-rose-400 rounded hover:bg-rose-900/30 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -554,7 +588,7 @@ export default function Links() {
                       <Settings2 className="w-3.5 h-3.5" />
                     </button>
                     <button 
-                      onClick={() => handleDeleteLink(link.id)} 
+                      onClick={() => requestDeleteLink(link.id, link.server_name)} 
                       className="p-2 text-rose-500 hover:text-rose-400 rounded bg-white/5 border border-white/5 transition-all cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -570,6 +604,25 @@ export default function Links() {
           )}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.type === 'report' ? 'Dismiss Report' : 'Delete Link'}
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={() => {
+          if (confirmDialog.targetId) {
+            if (confirmDialog.type === 'report') {
+              handleDeleteReport(confirmDialog.targetId);
+            } else if (confirmDialog.type === 'link') {
+              handleDeleteLink(confirmDialog.targetId);
+            }
+          }
+        }}
+        onCancel={() => setConfirmDialog({ isOpen: false, type: null, targetId: null, title: '', message: '' })}
+      />
     </div>
   );
 }

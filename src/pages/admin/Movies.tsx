@@ -11,12 +11,14 @@ import {
   EyeOff,
   Download,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Pencil
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 import type { Movie } from '../../types/database.types';
 import AddMovieDialog from '../../components/admin/AddMovieDialog';
+import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 
 export default function AdminMovies() {
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -24,6 +26,12 @@ export default function AdminMovies() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; movieId: string | null; movieTitle: string }>({
+    isOpen: false,
+    movieId: null,
+    movieTitle: ''
+  });
 
   const fetchMovies = async () => {
     if (!supabase) return;
@@ -90,9 +98,22 @@ export default function AdminMovies() {
   };
 
   const deleteMovie = async (id: string) => {
-    if (!supabase || !confirm('Are you sure you want to permanently delete this movie listing along with its categories and links?')) return;
-    await supabase.from('movies').delete().eq('id', id);
-    setMovies(prev => prev.filter(m => m.id !== id));
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('movies').delete().eq('id', id);
+      if (error) throw error;
+      setMovies(prev => prev.filter(m => m.id !== id));
+    } catch (err) {
+      console.error('Error deleting movie:', err);
+    }
+  };
+
+  const requestDeleteMovie = (movie: Movie) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      movieId: movie.id,
+      movieTitle: movie.title
+    });
   };
 
   const filteredMovies = movies.filter(movie => {
@@ -167,7 +188,15 @@ export default function AdminMovies() {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-14 bg-zinc-900 rounded overflow-hidden shrink-0 border border-white/5">
                             {movie.poster_url ? (
-                              <img src={movie.poster_url} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                              <img 
+                                src={movie.poster_url} 
+                                className="w-full h-full object-cover" 
+                                alt="" 
+                                referrerPolicy="no-referrer" 
+                                onError={(e) => {
+                                  e.currentTarget.src = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=100&auto=format&fit=crop";
+                                }}
+                              />
                             ) : (
                               <Film className="w-5 h-5 m-2.5 text-zinc-600 mx-auto mt-4" />
                             )}
@@ -222,7 +251,17 @@ export default function AdminMovies() {
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button 
-                            onClick={() => deleteMovie(movie.id)} 
+                            onClick={() => {
+                              setEditingMovie(movie);
+                              setIsAdding(true);
+                            }}
+                            className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 border border-transparent hover:border-white/5 transition-colors cursor-pointer"
+                            title="Edit Catalog Content"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => requestDeleteMovie(movie)} 
                             className="p-2 text-rose-500 hover:text-rose-400 rounded-lg hover:bg-rose-950/20 border border-transparent hover:border-rose-500/10 transition-colors cursor-pointer"
                             title="Delete Catalog Content"
                           >
@@ -252,7 +291,15 @@ export default function AdminMovies() {
                   <div className="flex items-start gap-3">
                     <div className="w-12 h-16 bg-zinc-900 rounded overflow-hidden shrink-0 border border-white/5">
                       {movie.poster_url ? (
-                        <img src={movie.poster_url} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                        <img 
+                          src={movie.poster_url} 
+                          className="w-full h-full object-cover" 
+                          alt="" 
+                          referrerPolicy="no-referrer" 
+                          onError={(e) => {
+                            e.currentTarget.src = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=100&auto=format&fit=crop";
+                          }}
+                        />
                       ) : (
                         <Film className="w-5 h-5 text-zinc-600 m-auto mt-5" />
                       )}
@@ -303,12 +350,23 @@ export default function AdminMovies() {
                   <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs text-zinc-550">
                     <span className="text-[10px] text-zinc-600 font-mono">Created {new Date(movie.created_at).toLocaleDateString()}</span>
                     
-                    <button 
-                      onClick={() => deleteMovie(movie.id)}
-                      className="px-2.5 py-1.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 font-bold border border-rose-500/20 rounded-lg inline-flex items-center gap-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Erase Entry
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          setEditingMovie(movie);
+                          setIsAdding(true);
+                        }}
+                        className="px-2.5 py-1.5 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 font-bold border border-zinc-700/50 rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button 
+                        onClick={() => requestDeleteMovie(movie)}
+                        className="px-2.5 py-1.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 font-bold border border-rose-500/20 rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Erase Entry
+                      </button>
+                    </div>
                   </div>
 
                 </div>
@@ -325,8 +383,28 @@ export default function AdminMovies() {
       {/* Dynamic add dialog */}
       <AddMovieDialog 
         isOpen={isAdding} 
-        onClose={() => setIsAdding(false)} 
+        onClose={() => {
+          setIsAdding(false);
+          setEditingMovie(null);
+        }} 
         onSuccess={fetchMovies} 
+        movieToEdit={editingMovie}
+      />
+
+      {/* Custom Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        title="Erase Movie Catalog Entry"
+        message={`Are you sure you want to permanently erase "${deleteConfirmation.movieTitle}" along with its ratings, related files, category mappings, and all secured links? This action is irreversible.`}
+        confirmText="Erase Catalog Entry"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirmation.movieId) {
+            deleteMovie(deleteConfirmation.movieId);
+          }
+        }}
+        onCancel={() => setDeleteConfirmation({ isOpen: false, movieId: null, movieTitle: '' })}
       />
     </div>
   );

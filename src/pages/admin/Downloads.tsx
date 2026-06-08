@@ -16,6 +16,7 @@ import {
   MoreVertical
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 
 interface Request {
   id: string;
@@ -37,6 +38,11 @@ export default function Downloads() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [notesInput, setNotesInput] = useState<{ [id: string]: string }>({});
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; requestId: string | null; requestTitle: string }>({
+    isOpen: false,
+    requestId: null,
+    requestTitle: ''
+  });
 
   const fetchRequests = async () => {
     if (!supabase) return;
@@ -114,7 +120,7 @@ export default function Downloads() {
   };
 
   const handleDeleteRequest = async (id: string) => {
-    if (!supabase || !confirm('Are you sure you want to delete this archive request?')) return;
+    if (!supabase) return;
     try {
       const { error } = await supabase
         .from('movie_requests')
@@ -126,6 +132,14 @@ export default function Downloads() {
     } catch (err) {
       console.error('Error deleting request:', err);
     }
+  };
+
+  const requestDelete = (id: string, title: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      requestId: id,
+      requestTitle: title
+    });
   };
 
   const filteredRequests = requests.filter(req => {
@@ -417,7 +431,7 @@ export default function Downloads() {
                           </Button>
                         )}
                         <button 
-                          onClick={() => handleDeleteRequest(req.id)} 
+                          onClick={() => requestDelete(req.id, req.title)} 
                           className="p-2 text-zinc-500 hover:text-rose-400 rounded-lg bg-zinc-900 transition-all cursor-pointer"
                         >
                           <XCircle className="w-4 h-4" />
@@ -435,6 +449,21 @@ export default function Downloads() {
           </>
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        title="Delete Archive Request"
+        message={`Are you sure you want to delete the movie request for "${deleteConfirmation.requestTitle}"? This cannot be undone.`}
+        confirmText="Yes, Delete Request"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirmation.requestId) {
+            handleDeleteRequest(deleteConfirmation.requestId);
+          }
+        }}
+        onCancel={() => setDeleteConfirmation({ isOpen: false, requestId: null, requestTitle: '' })}
+      />
     </div>
   );
 }

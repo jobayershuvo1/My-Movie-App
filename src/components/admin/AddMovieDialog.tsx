@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { X, Plus, Trash2, Film, Check, Loader2, Upload, Star, Calendar, Clock, Globe } from 'lucide-react';
+import { X, Plus, Trash2, Film, Check, Loader2, Upload, Star, Calendar, Clock, Globe, Wand2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
-import type { Category } from '../../types/database.types';
+import type { Category, Movie } from '../../types/database.types';
 
 interface AddMovieDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  movieToEdit?: Movie | null;
 }
 
 interface DownloadLinkInput {
@@ -24,11 +25,15 @@ const DEFAULT_GENRES = [
   'Thriller', 'War', 'Western'
 ];
 
-export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieDialogProps) {
+export default function AddMovieDialog({ isOpen, onClose, onSuccess, movieToEdit }: AddMovieDialogProps) {
   // Loading & Error States
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // AI State
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [aiMovieName, setAiMovieName] = useState('');
 
   // Form Fields State
   const [title, setTitle] = useState('');
@@ -52,7 +57,7 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
   const [customGenres, setCustomGenres] = useState<string[]>([]);
 
   // Download Links State
-  const [downloadLinks, setDownloadLinks] = useState<DownloadLinkInput[]>([
+  const [downloadLinks, setDownloadLinks] = useState<DownloadLinkInput[]>( [
     { server_name: 'Google Drive', url: '', quality: '1080p', file_size: '1.4 GB' }
   ]);
 
@@ -60,8 +65,89 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
   useEffect(() => {
     if (isOpen) {
       fetchCategories();
+      
+      if (movieToEdit) {
+        setTitle(movieToEdit.title || '');
+        setDescription(movieToEdit.description || '');
+        setPosterUrl(movieToEdit.poster_url || '');
+        setCoverUrl(movieToEdit.cover_url || '');
+        setReleaseYear(movieToEdit.release_year ? movieToEdit.release_year.toString() : '');
+        setImdbRating(movieToEdit.imdb_rating ? movieToEdit.imdb_rating.toString() : '');
+        setRuntime(movieToEdit.runtime ? movieToEdit.runtime.toString() : '');
+        setLanguage(movieToEdit.language || 'English');
+        setCountry(movieToEdit.country || 'United States');
+        setTrailerUrl(movieToEdit.trailer_url || '');
+        setDownloadEnabled(movieToEdit.download_enabled);
+        setPublished(movieToEdit.published);
+        setFeatured(movieToEdit.featured || false);
+        setTrending(movieToEdit.trending || false);
+        
+        // Fetch relations
+        fetchMovieCategories(movieToEdit.id);
+        fetchMovieDownloadLinks(movieToEdit.id);
+      } else {
+        // Reset form for blank slate
+        setTitle('');
+        setDescription('');
+        setPosterUrl('');
+        setCoverUrl('');
+        setReleaseYear('');
+        setImdbRating('');
+        setRuntime('');
+        setLanguage('English');
+        setCountry('United States');
+        setTrailerUrl('');
+        setDownloadEnabled(true);
+        setPublished(true);
+        setFeatured(false);
+        setTrending(false);
+        setSelectedCategoryIds([]);
+        setCustomGenres([]);
+        setDownloadLinks([
+          { server_name: 'Google Drive', url: '', quality: '1080p', file_size: '1.4 GB' }
+        ]);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, movieToEdit]);
+
+  const fetchMovieCategories = async (movieId: string) => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase
+        .from('movie_categories')
+        .select('category_id')
+        .eq('movie_id', movieId);
+        
+      if (error) throw error;
+      if (data) {
+        setSelectedCategoryIds(data.map(item => item.category_id));
+      }
+    } catch (err) {
+      console.error('Error fetching movie categories:', err);
+    }
+  };
+
+  const fetchMovieDownloadLinks = async (movieId: string) => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase
+        .from('download_links')
+        .select('server_name, url, quality, file_size')
+        .eq('movie_id', movieId)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setDownloadLinks(data);
+      } else {
+        setDownloadLinks([
+          { server_name: 'Google Drive', url: '', quality: '1080p', file_size: '1.4 GB' }
+        ]);
+      }
+    } catch (err) {
+      console.error('Error fetching movie download links:', err);
+    }
+  };
 
   const fetchCategories = async () => {
     if (!supabase) return;
@@ -83,6 +169,63 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
   };
 
   if (!isOpen) return null;
+
+  // AI Auto-Fill Handler
+  const handleAiAutoFill = async () => {
+    if (!aiMovieName.trim()) {
+      setError("Please enter a movie name for AI Auto-Fill.");
+      return;
+    }
+    
+    setIsAutoFilling(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/movies/autofill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movieName: aiMovieName })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch AI details.');
+      }
+      
+      // Populate fields
+      if (data.title) setTitle(data.title);
+      if (data.description) setDescription(data.description);
+      if (data.releaseYear) setReleaseYear(data.releaseYear.toString());
+      if (data.imdbRating) setImdbRating(data.imdbRating.toString());
+      if (data.runtime) setRuntime(data.runtime.toString());
+      if (data.language) setLanguage(data.language);
+      if (data.country) setCountry(data.country);
+      if (data.posterUrl) setPosterUrl(data.posterUrl);
+      if (data.coverUrl) setCoverUrl(data.coverUrl);
+      if (data.trailerUrl) setTrailerUrl(data.trailerUrl);
+      
+      // Auto-tag categories
+      if (data.genres && Array.isArray(data.genres)) {
+        const newCustomGenres = [...customGenres];
+        for (const genre of data.genres) {
+          if (!newCustomGenres.includes(genre) && !DEFAULT_GENRES.includes(genre)) {
+             newCustomGenres.push(genre);
+          } else if (DEFAULT_GENRES.includes(genre) && !newCustomGenres.includes(genre)) {
+             newCustomGenres.push(genre);
+          }
+        }
+        setCustomGenres(newCustomGenres);
+      }
+      
+      setAiMovieName(''); // clear after success
+    } catch (err: any) {
+      console.error(err);
+      setError(`AI Auto-Fill Error: ${err.message}`);
+    } finally {
+      setIsAutoFilling(false);
+    }
+  };
 
   // File Upload Handlers (for Supabase Storage)
   const handleFileUpload = async (
@@ -160,7 +303,7 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
     setError(null);
 
     try {
-      // 1. Create Movie
+      // 1. Create or Update Movie
       const movieDoc = {
         title,
         description,
@@ -178,16 +321,27 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
         trending
       };
 
-      const { data: movieData, error: movieError } = await supabase
-        .from('movies')
-        .insert([movieDoc])
-        .select()
-        .single();
+      let movieId: string;
 
-      if (movieError) throw movieError;
-      if (!movieData) throw new Error('Failed to create movie record.');
+      if (movieToEdit) {
+        const { error: movieError } = await supabase
+          .from('movies')
+          .update(movieDoc)
+          .eq('id', movieToEdit.id);
 
-      const movieId = movieData.id;
+        if (movieError) throw movieError;
+        movieId = movieToEdit.id;
+      } else {
+        const { data: movieData, error: movieError } = await supabase
+          .from('movies')
+          .insert([movieDoc])
+          .select()
+          .single();
+
+        if (movieError) throw movieError;
+        if (!movieData) throw new Error('Failed to create movie record.');
+        movieId = movieData.id;
+      }
 
       // 2. Resolve final category IDs (using selected DB categories and newly selected custom default genre tags)
       let finalCategoryIds = [...selectedCategoryIds];
@@ -216,6 +370,14 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
         }
       }
 
+      // Clear existing associations if editing
+      if (movieToEdit) {
+        await supabase
+          .from('movie_categories')
+          .delete()
+          .eq('movie_id', movieId);
+      }
+
       // 3. Link Categories
       if (finalCategoryIds.length > 0) {
         const movieCategoryRelations = finalCategoryIds.map(catId => ({
@@ -228,6 +390,14 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
           .insert(movieCategoryRelations);
           
         if (relError) console.error('Failed linking categories:', relError);
+      }
+
+      // Clear existing download links if editing
+      if (movieToEdit) {
+        await supabase
+          .from('download_links')
+          .delete()
+          .eq('movie_id', movieId);
       }
 
       // 4. Save Download Links
@@ -291,8 +461,12 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
               <Film className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white leading-tight">Create Movie Catalog Entry</h2>
-              <p className="text-xs text-zinc-500">Add detailed cinema meta info, genres, and high quality download paths.</p>
+              <h2 className="text-lg font-bold text-white leading-tight">
+                {movieToEdit ? 'Edit Movie Catalog Entry' : 'Create Movie Catalog Entry'}
+              </h2>
+              <p className="text-xs text-zinc-500">
+                {movieToEdit ? 'Modify cinematic metadata, categories, and direct paths.' : 'Add detailed cinema meta info, genres, and high quality download paths.'}
+              </p>
             </div>
           </div>
           <button 
@@ -310,6 +484,49 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
               {error}
             </div>
           )}
+
+          {/* AI Auto-Fill Tool Banner */}
+          <div className="p-4 bg-gradient-to-r from-violet-500/10 to-transparent border border-violet-500/20 rounded-xl space-y-3">
+            <div className="flex items-center gap-2">
+              <Wand2 className="w-4 h-4 text-violet-400" />
+              <h3 className="text-sm font-bold text-violet-100">AI Auto-Fill Assistant</h3>
+            </div>
+            <p className="text-xs text-violet-300/70">
+              Enter a movie name and Gemini AI will automatically fetch and fill out the metadata, cover, poster, and tags for you.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+               <input
+                 type="text"
+                 value={aiMovieName}
+                 onChange={e => setAiMovieName(e.target.value)}
+                 onKeyDown={(e) => {
+                   if (e.key === 'Enter') {
+                     e.preventDefault();
+                     handleAiAutoFill();
+                   }
+                 }}
+                 placeholder="e.g. Inception 2010"
+                 className="flex-1 bg-black/40 border border-violet-500/20 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-violet-500/50"
+                 disabled={isAutoFilling}
+               />
+               <Button
+                 type="button"
+                 onClick={handleAiAutoFill}
+                 disabled={isAutoFilling}
+                 className="bg-violet-600 hover:bg-violet-500 text-white gap-2 shrink-0 border-none"
+               >
+                 {isAutoFilling ? (
+                   <>
+                     <Loader2 className="w-4 h-4 animate-spin text-white" /> Querying Gemini...
+                   </>
+                 ) : (
+                   <>
+                     <Wand2 className="w-4 h-4" /> Auto-Fill
+                   </>
+                 )}
+               </Button>
+            </div>
+          </div>
 
           {/* Section 1: Basic Information */}
           <div className="space-y-4">
@@ -725,11 +942,11 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess }: AddMovieD
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" /> Saving catalog entry...
+                <Loader2 className="w-4 h-4 animate-spin text-white" /> {movieToEdit ? 'Updating catalog entry...' : 'Saving catalog entry...'}
               </>
             ) : (
               <>
-                <Check className="w-4 h-4" /> Save Cinema Entry
+                <Check className="w-4 h-4" /> {movieToEdit ? 'Update Cinema Entry' : 'Save Cinema Entry'}
               </>
             )}
           </Button>

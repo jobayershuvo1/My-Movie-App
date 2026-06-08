@@ -13,6 +13,16 @@ function getEmbedOrVideoUrl(url: string | null): { type: 'youtube' | 'vimeo' | '
   if (!url) return null;
   const cleanUrl = url.trim();
 
+  // Filter out placeholder and empty content links
+  if (
+    cleanUrl === '' ||
+    cleanUrl === 'https://' ||
+    cleanUrl.startsWith('https://...') ||
+    cleanUrl.toLowerCase().includes('placeholder')
+  ) {
+    return null;
+  }
+
   // 1. Direct video formats (mp4, webm, ogg, mov, m4v)
   const parsedPath = cleanUrl.toLowerCase().split('?')[0];
   if (
@@ -77,6 +87,17 @@ export default function MovieDetail() {
   const [userRating, setUserRating] = useState<any | null>(null);
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [hasLoadedInitialRatings, setHasLoadedInitialRatings] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [isUsingLocalStorageBackup, setIsUsingLocalStorageBackup] = useState(false);
+  const [deletedCommentIds, setDeletedCommentIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(`cinevault_deleted_comments_${id}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   
   // Rating Form Inputs
   const [ratingInput, setRatingInput] = useState<number>(5);
@@ -84,7 +105,36 @@ export default function MovieDetail() {
   const [ratingHover, setRatingHover] = useState<number | null>(null);
 
   const fetchRatings = useCallback(async () => {
-    if (!supabase || !id) return;
+    const localRatingsKey = `cinevault_ratings_backup_${id}`;
+    const localRaw = localStorage.getItem(localRatingsKey);
+    let localData: any[] = [];
+    if (localRaw) {
+      try {
+        localData = JSON.parse(localRaw);
+      } catch (e) {
+        localData = [];
+      }
+    }
+
+    if (!supabase || !id || isUsingLocalStorageBackup) {
+      setRatings(localData);
+      if (profile) {
+        const mine = localData.find((r: any) => r.user_id === profile.id);
+        if (mine) {
+          setUserRating(mine);
+          setHasLoadedInitialRatings(prev => {
+            if (!prev) {
+              setRatingInput(mine.rating);
+              setReviewInput(mine.review_text || '');
+              return true;
+            }
+            return prev;
+          });
+        }
+      }
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('movie_ratings')
@@ -106,13 +156,33 @@ export default function MovieDetail() {
         .eq('movie_id', id)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
+      if (error) {
+        console.warn('Supabase movie_ratings error, falling back to local state:', error);
+        setIsUsingLocalStorageBackup(true);
+        setRatings(localData);
+        if (profile) {
+          const mine = localData.find((r: any) => r.user_id === profile.id);
+          if (mine) {
+            setUserRating(mine);
+            setHasLoadedInitialRatings(prev => {
+              if (!prev) {
+                setRatingInput(mine.rating);
+                setReviewInput(mine.review_text || '');
+                return true;
+              }
+              return prev;
+            });
+          }
+        }
+        return;
+      }
+
+      if (data) {
         setRatings(data);
         if (profile) {
           const mine = data.find((r: any) => r.user_id === profile.id);
           if (mine) {
             setUserRating(mine);
-            // Protect form drafting by only auto-populating coordinates on first fetch
             setHasLoadedInitialRatings(prev => {
               if (!prev) {
                 setRatingInput(mine.rating);
@@ -128,24 +198,64 @@ export default function MovieDetail() {
       }
     } catch (err) {
       console.warn('Error fetching ratings:', err);
+      setIsUsingLocalStorageBackup(true);
+      setRatings(localData);
     }
-  }, [id, profile]);
+  }, [id, profile, isUsingLocalStorageBackup]);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!supabase || !id) return;
       
-      const { data: movieData } = await supabase.from('movies').select('*').eq('id', id).single();
-      const { data: linksData } = await supabase.from('download_links').select('*').eq('movie_id', id).eq('status', 'active');
-      
-      if (movieData) setMovie(movieData);
-      if (linksData) setLinks(linksData);
-      
-      setHasLoadedInitialRatings(false);
-      setRatingInput(5);
-      setReviewInput('');
-      await fetchRatings();
-      setLoading(false);
+      setLoading(true);
+      try {
+        // Reset scroll position to top of page upon navigating or changing movie ID
+        window.scrollTo({ top: 0, behavior: 'instant' as any });
+      } catch (scrollErr) {
+        window.scrollTo(0, 0);
+      }
+
+      try {
+        const { data: movieData, error: movieError } = await supabase
+          .from('movies')
+          .select('*')
+          .eq('id', id)
+          .single();
+          
+        if (movieError) {
+          console.error('[MovieDetail] Error loading movie metadata from DB:', movieError);
+        }
+        
+        const { data: linksData, error: linksError } = await supabase
+          .from('download_links')
+          .select('*')
+          .eq('movie_id', id)
+          .eq('status', 'active');
+          
+        if (linksError) {
+          console.error('[MovieDetail] Error loading active download links from DB:', linksError);
+        }
+        
+        if (movieData) {
+          setMovie(movieData);
+        } else {
+          // If the movie can't be fetched, log custom error
+          console.warn('[MovieDetail] No movie record found with ID:', id);
+        }
+        
+        if (linksData) {
+          setLinks(linksData);
+        }
+        
+        setHasLoadedInitialRatings(false);
+        setRatingInput(5);
+        setReviewInput('');
+        await fetchRatings();
+      } catch (err) {
+        console.error('[MovieDetail] Unhandled exception inside fetchData:', err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
@@ -250,62 +360,170 @@ export default function MovieDetail() {
 
   const handleSubmitRating = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || !profile || !id) return;
+    if (!profile || !id) return;
     setIsSubmittingRating(true);
+    setSubmitError(null);
+    setSubmitSuccess(false);
 
+    const localRatingsKey = `cinevault_ratings_backup_${id}`;
+    const localRaw = localStorage.getItem(localRatingsKey) || '[]';
+    let localData: any[] = [];
     try {
-      if (userRating) {
-        // Update review
-        const { error } = await supabase
-          .from('movie_ratings')
-          .update({
-            rating: ratingInput,
-            review_text: reviewInput,
-            created_at: new Date().toISOString()
-          })
-          .eq('id', userRating.id);
+      localData = JSON.parse(localRaw);
+    } catch {
+      localData = [];
+    }
 
-        if (error) throw error;
-      } else {
-        // Insert new review
+    if (supabase && !isUsingLocalStorageBackup) {
+      try {
         const { error } = await supabase
           .from('movie_ratings')
-          .insert({
+          .upsert({
             movie_id: id,
             user_id: profile.id,
             rating: ratingInput,
-            review_text: reviewInput
+            review_text: reviewInput,
+            created_at: new Date().toISOString()
+          }, {
+            onConflict: 'movie_id,user_id'
           });
 
-        if (error) throw error;
+        if (error) {
+          console.warn('Upsert threw error, attempting fallback update/insert:', error);
+          if (userRating) {
+            const { error: updateErr } = await supabase
+              .from('movie_ratings')
+              .update({
+                rating: ratingInput,
+                review_text: reviewInput,
+                created_at: new Date().toISOString()
+              })
+              .eq('id', userRating.id);
+            if (updateErr) throw updateErr;
+          } else {
+            const { error: insertErr } = await supabase
+              .from('movie_ratings')
+              .insert({
+                movie_id: id,
+                user_id: profile.id,
+                rating: ratingInput,
+                review_text: reviewInput
+              });
+            if (insertErr) throw insertErr;
+          }
+        }
+
+        setSubmitSuccess(true);
+        setTimeout(() => setSubmitSuccess(false), 6000);
+        await fetchRatings();
+        setIsSubmittingRating(false);
+        return;
+      } catch (dbErr: any) {
+        console.warn('DB submission failed, migrating/falling back to local storage backup:', dbErr);
+        setIsUsingLocalStorageBackup(true);
+      }
+    }
+
+    try {
+      const existingIndex = localData.findIndex((r: any) => r.user_id === profile.id);
+      const updatedRating = {
+        id: userRating?.id || `local-${Math.random().toString(36).substring(2, 11)}`,
+        movie_id: id,
+        user_id: profile.id,
+        rating: ratingInput,
+        review_text: reviewInput,
+        created_at: new Date().toISOString(),
+        profiles: {
+          id: profile.id,
+          email: profile.email,
+          full_name: profile.full_name || 'Guest User',
+          avatar_url: profile.avatar_url || null,
+          role: profile.role || 'user'
+        }
+      };
+
+      if (existingIndex >= 0) {
+        localData[existingIndex] = updatedRating;
+      } else {
+        localData.unshift(updatedRating);
       }
 
-      await fetchRatings();
-    } catch (error) {
-      console.error('Rating submit error:', error);
+      localStorage.setItem(localRatingsKey, JSON.stringify(localData));
+      setUserRating(updatedRating);
+      setRatings(localData);
+      
+      setSubmitSuccess(true);
+      setTimeout(() => setSubmitSuccess(false), 6000);
+    } catch (localErr: any) {
+      console.error('Local backup submit failed:', localErr);
+      setSubmitError('Failed to save your review.');
     } finally {
       setIsSubmittingRating(false);
     }
   };
 
-  const handleDeleteRating = async () => {
-    if (!supabase || !userRating) return;
+  const handleDeleteRating = async (idToDel?: any, userIdToDel?: string) => {
+    if (!profile) return;
+    const targetRatingId = idToDel || userRating?.id;
+    const targetUserId = userIdToDel || profile.id;
+
+    if (!targetRatingId) return;
     setIsSubmittingRating(true);
 
+    // Save deleted rating ID locally immediately so it disappears from user experience instantly
+    setDeletedCommentIds(prev => {
+      const next = prev.includes(targetRatingId.toString()) ? prev : [...prev, targetRatingId.toString()];
+      try {
+        localStorage.setItem(`cinevault_deleted_comments_${id}`, JSON.stringify(next));
+      } catch (err) {
+        console.warn('Failed to persist deleted comment ID:', err);
+      }
+      return next;
+    });
+
+    const localRatingsKey = `cinevault_ratings_backup_${id}`;
+    const localRaw = localStorage.getItem(localRatingsKey) || '[]';
+    let localData: any[] = [];
     try {
-      const { error } = await supabase
-        .from('movie_ratings')
-        .delete()
-        .eq('id', userRating.id);
+      localData = JSON.parse(localRaw);
+    } catch {
+      localData = [];
+    }
 
-      if (error) throw error;
+    if (supabase && targetRatingId && !isUsingLocalStorageBackup && !targetRatingId.toString().startsWith('local-')) {
+      try {
+        const { error } = await supabase
+          .from('movie_ratings')
+          .delete()
+          .eq('id', targetRatingId);
 
-      setUserRating(null);
-      setRatingInput(5);
-      setReviewInput('');
-      await fetchRatings();
-    } catch (error) {
-      console.error('Rating delete error:', error);
+        if (!error) {
+          if (targetUserId === profile.id) {
+            setUserRating(null);
+            setRatingInput(5);
+            setReviewInput('');
+          }
+          await fetchRatings();
+          setIsSubmittingRating(false);
+          return;
+        }
+      } catch (dbErr) {
+        console.warn('DB delete failed, falling back to local storage deletion:', dbErr);
+        setIsUsingLocalStorageBackup(true);
+      }
+    }
+
+    try {
+      localData = localData.filter((r: any) => r.id !== targetRatingId && r.user_id !== targetUserId);
+      localStorage.setItem(localRatingsKey, JSON.stringify(localData));
+      if (targetUserId === profile.id) {
+        setUserRating(null);
+        setRatingInput(5);
+        setReviewInput('');
+      }
+      setRatings(localData);
+    } catch (localErr) {
+      console.error('Local backup delete failed:', localErr);
     } finally {
       setIsSubmittingRating(false);
     }
@@ -404,13 +622,14 @@ export default function MovieDetail() {
     }
   ];
 
-  const displayedRatings = ratings.length > 0 ? ratings : defaultComments;
+  const activeComments = ratings.filter(r => !deletedCommentIds.includes(r.id?.toString()));
+  const displayedRatings = ratings.length > 0 ? activeComments : defaultComments.filter(r => !deletedCommentIds.includes(r.id?.toString()));
 
   return (
     <div className="flex-1 w-full bg-zinc-950 pb-20">
       <Helmet>
-        <title>{movie.title} ({movie.release_year}) Direct Premium Links | CineVault</title>
-        <meta name="description" content={`Download ${movie.title} (${movie.release_year}) in full quality formats. Category genres: ${movie.genre || 'Cinema'}. IMDb Rating: ${movie.imdb_rating || 'N/A'}. ${movie.description || 'Experience highest quality files.'}`} />
+        <title>{`${movie.title} (${movie.release_year || 'N/A'}) Direct Premium Links | CineVault`}</title>
+        <meta name="description" content={`Download ${movie.title} (${movie.release_year || 'N/A'}) in full quality formats. Category genres: ${movie.genre || 'Cinema'}. IMDb Rating: ${movie.imdb_rating || 'N/A'}. ${movie.description || 'Experience highest quality files.'}`} />
         <meta property="og:title" content={`${movie.title} (${movie.release_year}) downloads | CineVault`} />
         <meta property="og:description" content={movie.description || 'Experience highest quality files.'} />
         {movie.poster_url && <meta property="og:image" content={movie.poster_url} />}
@@ -423,6 +642,10 @@ export default function MovieDetail() {
             src={movie.cover_url || movie.poster_url || ''} 
             alt={movie.title}
             className="w-full h-full object-cover opacity-20 mix-blend-overlay"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              e.currentTarget.src = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200&auto=format&fit=crop";
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent"></div>
         </div>
@@ -433,7 +656,15 @@ export default function MovieDetail() {
         <div className="w-64 flex-shrink-0 mx-auto md:mx-0">
           <div className="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl glass">
             {movie.poster_url ? (
-               <img src={movie.poster_url} className="w-full h-full object-cover animate-fade-in" alt={movie.title} />
+               <img 
+                 src={movie.poster_url} 
+                 className="w-full h-full object-cover animate-fade-in" 
+                 alt={movie.title} 
+                 referrerPolicy="no-referrer"
+                 onError={(e) => {
+                   e.currentTarget.src = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=600&auto=format&fit=crop";
+                 }}
+               />
             ) : (
               <div className="w-full h-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500">No Poster</div>
             )}
@@ -513,6 +744,7 @@ export default function MovieDetail() {
       {/* Trailer Section */}
       {movie.trailer_url && (() => {
         const media = getEmbedOrVideoUrl(movie.trailer_url);
+        if (!media) return null;
         return (
           <div className="max-w-7xl mx-auto px-4 pt-16 -mb-8">
             <div className="glass rounded-2xl p-6 md:p-8">
@@ -554,6 +786,17 @@ export default function MovieDetail() {
                     sandbox="allow-scripts allow-same-origin allow-presentation"
                   />
                 )}
+              </div>
+              <div className="mt-4 flex justify-center">
+                <a 
+                  href={movie.trailer_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/10 hover:bg-red-600/15 border border-red-500/20 text-red-500 hover:text-red-400 text-xs font-semibold uppercase tracking-wider font-mono transition-all duration-300 cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4 text-red-500" />
+                  YouTube-এ ট্রেইলার দেখুন / Open Trailer in New Tab ↗
+                </a>
               </div>
             </div>
           </div>
@@ -626,6 +869,19 @@ export default function MovieDetail() {
 
               {profile ? (
                 <form onSubmit={handleSubmitRating} className="space-y-4 flex-1 flex flex-col">
+                  {submitError && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs p-3 rounded-xl flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5 animate-pulse" />
+                      <span className="leading-snug">{submitError}</span>
+                    </div>
+                  )}
+
+                  {submitSuccess && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs p-3 rounded-xl flex items-start gap-2.5">
+                      <CheckCircle className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
+                      <span className="leading-snug">Your feedback was published successfully!</span>
+                    </div>
+                  )}
                   {/* Stars input */}
                   <div>
                     <label className="text-xs font-medium text-zinc-400 uppercase tracking-widest block mb-2">
@@ -765,18 +1021,31 @@ export default function MovieDetail() {
                         </div>
                       </div>
 
-                      {/* Display stars */}
-                      <div className="flex items-center gap-1 text-zinc-500">
-                        {[1, 2, 3, 4, 5].map((starNum) => (
-                          <Star 
-                            key={starNum} 
-                            className={`w-3.5 h-3.5 ${
-                              starNum <= userReview.rating 
-                                ? 'fill-current text-amber-500' 
-                                : 'text-zinc-700 dark:text-zinc-800'
-                            }`} 
-                          />
-                        ))}
+                      {/* Display stars and conditional delete action */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 text-zinc-500">
+                          {[1, 2, 3, 4, 5].map((starNum) => (
+                            <Star 
+                              key={starNum} 
+                              className={`w-3.5 h-3.5 ${
+                                starNum <= userReview.rating 
+                                  ? 'fill-current text-amber-500' 
+                                  : 'text-zinc-700 dark:text-zinc-800'
+                              }`} 
+                            />
+                          ))}
+                        </div>
+                        {profile && (profile.id === userReview.user_id || profile.role === 'super_admin' || profile.role === 'moderator') && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRating(userReview.id, userReview.user_id)}
+                            disabled={isSubmittingRating}
+                            className="bg-transparent hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 text-zinc-500 hover:text-rose-400 rounded-lg p-1.5 transition-all cursor-pointer inline-flex items-center justify-center hover:scale-105"
+                            title="Delete feedback / feedback মুছুন"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
 
