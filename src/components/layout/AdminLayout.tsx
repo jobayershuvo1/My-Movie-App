@@ -13,6 +13,7 @@ import {
   Activity
 } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
+import ProgressBar from '../ui/ProgressBar';
 
 const SIDERBAR_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
@@ -30,7 +31,10 @@ export default function AdminLayout() {
   const { signOut, profile } = useAuthStore();
 
   const allowedSidebarItems = SIDERBAR_ITEMS.filter((item) => {
-    if (item.path === '/admin/users' || item.path === '/admin/settings') {
+    if (item.path === '/admin/users') {
+      return ['super_admin', 'admin', 'moderator', 'editor'].includes(profile?.role || '');
+    }
+    if (item.path === '/admin/settings') {
       return profile?.role === 'super_admin';
     }
     return true;
@@ -38,6 +42,7 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex font-sans">
+      <ProgressBar />
       {/* Sidebar Overlay for Mobile */}
       {isSidebarOpen && (
         <div 

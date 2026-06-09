@@ -1,19 +1,12 @@
 {
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "server.ts",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "server.ts"
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
     },
     {
-      "src": "/(.*)",
-      "dest": "server.ts"
+      "source": "/((?!assets/|favicon.ico|.*\\\\.png|.*\\\\.jpg|.*\\\\.svg|.*\\\\.css|.*\\\\.js).*)",
+      "destination": "/index.html"
     }
   ]
 }

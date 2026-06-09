@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/auth';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
+import ProgressBar from '../ui/ProgressBar';
 
 export default function PublicLayout() {
   const { profile, signOut } = useAuthStore();
@@ -220,6 +221,7 @@ export default function PublicLayout() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-red-500/30">
+      <ProgressBar />
       <Helmet>
         <title>{seo.title}</title>
         <meta name="description" content={seo.description} />

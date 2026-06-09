@@ -41,12 +41,15 @@ export default function Users() {
     userName: ''
   });
 
-  if (profile?.role !== 'super_admin') {
+  const isAuthorizedToView = ['super_admin', 'admin', 'moderator', 'editor'].includes(profile?.role || '');
+  const isSuperAdmin = profile?.role === 'super_admin';
+
+  if (!isAuthorizedToView) {
     return (
       <div className="p-8 text-center bg-zinc-950 text-white flex flex-col items-center justify-center min-h-[50vh]">
         <ShieldAlert className="w-12 h-12 text-red-500 mb-4 animate-bounce" />
         <h3 className="text-xl font-bold mb-2">Access Denied</h3>
-        <p className="text-zinc-400 max-w-md">Only the Super Admin (<span className="text-red-400 font-semibold font-mono">jobayershuvo1122@gmail.com</span>) has permission to manage users, update authorization settings, or elevate roles.</p>
+        <p className="text-zinc-400 max-w-md">Only authorized personnel (Super Admin, Admins, Moderators, and Editors) have permission to view high level system users and registered members.</p>
       </div>
     );
   }
@@ -323,8 +326,9 @@ export default function Users() {
                             <select
                               value={usr.role}
                               onChange={e => handleUpdateRole(usr.id, e.target.value as any)}
-                              disabled={isRootAdmin}
+                              disabled={isRootAdmin || !isSuperAdmin}
                               className="bg-zinc-950 border border-white/10 rounded px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-red-500 font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={!isSuperAdmin ? "Only the Super Admin can alter user roles" : ""}
                             >
                               <option value="user">User</option>
                               <option value="editor">Editor</option>
@@ -391,8 +395,9 @@ export default function Users() {
                         <select
                           value={usr.role}
                           onChange={e => handleUpdateRole(usr.id, e.target.value as any)}
-                          disabled={isRootAdmin}
-                          className="bg-zinc-900 border border-white/10 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-red-500 cursor-pointer disabled:opacity-50"
+                          disabled={isRootAdmin || !isSuperAdmin}
+                          className="bg-zinc-900 border border-white/10 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-red-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={!isSuperAdmin ? "Only the Super Admin can alter user roles" : ""}
                         >
                           <option value="user">User</option>
                           <option value="editor">Editor</option>
