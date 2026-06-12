@@ -30,6 +30,7 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess, movieToEdit
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRlsError, setIsRlsError] = useState(false);
 
   // AI State
   const [isAutoFilling, setIsAutoFilling] = useState(false);
@@ -64,6 +65,8 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess, movieToEdit
   // Load existing categories from Supabase, or insert default ones
   useEffect(() => {
     if (isOpen) {
+      setIsRlsError(false);
+      setError(null);
       fetchCategories();
       
       if (movieToEdit) {
@@ -451,6 +454,9 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess, movieToEdit
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'An error occurred while saving the movie.');
+      if (err.message && (err.message.includes('row-level security') || err.message.includes('RLS') || err.message.includes('violates row-level security'))) {
+        setIsRlsError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -486,8 +492,183 @@ export default function AddMovieDialog({ isOpen, onClose, onSuccess, movieToEdit
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           {error && (
-            <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
-              {error}
+            <div className="space-y-4">
+              <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
+                {error}
+              </div>
+              
+              {isRlsError && (
+                <div className="p-5 text-zinc-100 bg-zinc-900 border border-red-500/30 rounded-xl space-y-4 shadow-xl">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                    <h4 className="text-sm font-bold text-red-400">Database Permission Bypass Required</h4>
+                  </div>
+                  
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    By default, your Supabase Row Level Security (RLS) restricts database write permissions for the <strong>Moderator</strong> role. To immediately unlock full write access for Moderators, copy and run the SQL query below in your <span className="text-zinc-200">Supabase SQL Editor</span>:
+                  </p>
+                  
+                  <div className="relative group bg-black/60 rounded-lg border border-white/5 p-3.5">
+                    <pre className="text-xs text-green-400 font-mono overflow-x-auto whitespace-pre select-all max-h-48 leading-relaxed scrollbar-thin">
+{`-- SQL PATCH: Grant moderator write access to movies & links
+-- 1. Movies Table Write Policies
+DROP POLICY IF EXISTS "Allow curators to manage movies" ON movies;
+DROP POLICY IF EXISTS "Insert policy for admin/super_admin/moderator" ON movies;
+DROP POLICY IF EXISTS "Update policy for admin/super_admin/moderator" ON movies;
+DROP POLICY IF EXISTS "Delete policy for admin/super_admin/moderator" ON movies;
+
+CREATE POLICY "Allow privileged roles to insert movies" ON movies
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+CREATE POLICY "Allow privileged roles to update movies" ON movies
+  FOR UPDATE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+CREATE POLICY "Allow privileged roles to delete movies" ON movies
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+-- 2. Movies & Categories Joint Tables Policies
+DROP POLICY IF EXISTS "Allow curators to manage movie_categories" ON movie_categories;
+CREATE POLICY "Allow privileged roles to manage movie_categories" ON movie_categories
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+DROP POLICY IF EXISTS "Allow curators to manage categories" ON categories;
+CREATE POLICY "Allow privileged roles to manage categories" ON categories
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+-- 3. Download Links Policies
+DROP POLICY IF EXISTS "Allow curators to manage download_links" ON download_links;
+CREATE POLICY "Allow privileged roles to manage download_links" ON download_links
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );`}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sqlText = `-- SQL PATCH: Grant moderator write access to movies & links
+-- 1. Movies Table Write Policies
+DROP POLICY IF EXISTS "Allow curators to manage movies" ON movies;
+DROP POLICY IF EXISTS "Insert policy for admin/super_admin/moderator" ON movies;
+DROP POLICY IF EXISTS "Update policy for admin/super_admin/moderator" ON movies;
+DROP POLICY IF EXISTS "Delete policy for admin/super_admin/moderator" ON movies;
+
+CREATE POLICY "Allow privileged roles to insert movies" ON movies
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+CREATE POLICY "Allow privileged roles to update movies" ON movies
+  FOR UPDATE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+CREATE POLICY "Allow privileged roles to delete movies" ON movies
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+-- 2. Movies & Categories Joint Tables Policies
+DROP POLICY IF EXISTS "Allow curators to manage movie_categories" ON movie_categories;
+CREATE POLICY "Allow privileged roles to manage movie_categories" ON movie_categories
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+DROP POLICY IF EXISTS "Allow curators to manage categories" ON categories;
+CREATE POLICY "Allow privileged roles to manage categories" ON categories
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );
+
+-- 3. Download Links Policies
+DROP POLICY IF EXISTS "Allow curators to manage download_links" ON download_links;
+CREATE POLICY "Allow privileged roles to manage download_links" ON download_links
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'moderator')
+    )
+  );`;
+                        navigator.clipboard.writeText(sqlText);
+                        alert("SQL Query Copied to Clipboard! Run it inside your Supabase Project's SQL Editor to immediately enable Moderator permissions.");
+                      }}
+                      className="absolute top-2 right-2 px-2.5 py-1.5 bg-zinc-800 text-zinc-300 hover:text-white rounded text-[11px] font-semibold transition-all border border-white/5 cursor-pointer"
+                    >
+                      Copy SQL Code
+                    </button>
+                  </div>
+                  <div className="text-zinc-500 font-mono text-[10px] text-center">
+                    Copy the query and run it on <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-red-400 underline">Supabase Console</a> SQL Editor.
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
