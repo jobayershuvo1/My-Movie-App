@@ -35,6 +35,18 @@ export default function PublicLayout() {
         description: 'Search for high-quality, high-speed movie releases on CineVault database. Filter by quality, language formats, and release year.',
       };
     }
+    if (pathname === '/blog' || pathname.startsWith('/blog/')) {
+      return {
+        title: 'CineVault Blog | Movie News, Reviews & Editorials',
+        description: 'Read the latest movie news, in-depth reviews, editorials, and interviews written by the CineVault community of authors.',
+      };
+    }
+    if (pathname === '/become-author') {
+      return {
+        title: 'Become an Author | Write for CineVault',
+        description: 'Apply to join the CineVault author program and publish your own movie reviews, news, and editorials.',
+      };
+    }
     if (pathname === '/requests') {
       return {
         title: 'Request Missing Movies & Links | CineVault Community',
@@ -247,6 +259,7 @@ export default function PublicLayout() {
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
             <Link to="/" className="hover:text-white transition-colors">Home</Link>
             <Link to="/movies" className="hover:text-white transition-colors">Movies</Link>
+            <Link to="/blog" className="hover:text-white transition-colors">Blog</Link>
             <Link to="/requests" className="hover:text-white transition-colors">Requests</Link>
           </div>
 
@@ -482,8 +495,15 @@ export default function PublicLayout() {
                   >
                     Movies
                   </Link>
-                  <Link 
-                    to="/requests" 
+                  <Link
+                    to="/blog"
+                    className="text-zinc-300 hover:text-white py-3 px-3 rounded-xl hover:bg-white/5 transition-all flex items-center gap-2"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Blog
+                  </Link>
+                  <Link
+                    to="/requests"
                     className="text-zinc-300 hover:text-white py-3 px-3 rounded-xl hover:bg-white/5 transition-all flex items-center gap-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
@@ -595,8 +615,9 @@ export default function PublicLayout() {
               <h3 className="font-semibold text-zinc-200 mb-4">Navigation</h3>
               <ul className="space-y-2 text-sm text-zinc-500">
                 <li><Link to="/" className="hover:text-red-400 transition-colors">Home</Link></li>
-                <li><Link to="/trending" className="hover:text-red-400 transition-colors">Trending Now</Link></li>
-                <li><Link to="/latest" className="hover:text-red-400 transition-colors">Latest Releases</Link></li>
+                <li><Link to="/movies" className="hover:text-red-400 transition-colors">Movies</Link></li>
+                <li><Link to="/blog" className="hover:text-red-400 transition-colors">Blog</Link></li>
+                <li><Link to="/become-author" className="hover:text-red-400 transition-colors">Become an Author</Link></li>
               </ul>
             </div>
             <div>

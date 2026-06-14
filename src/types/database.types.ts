@@ -5,6 +5,8 @@ export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type MovieRating = Database['public']['Tables']['movie_ratings']['Row'];
 export type Notification = Database['public']['Tables']['notifications']['Row'];
 export type ActivityLog = Database['public']['Tables']['activity_logs']['Row'];
+export type BlogPost = Database['public']['Tables']['blog_posts']['Row'];
+export type AuthorRequest = Database['public']['Tables']['author_requests']['Row'];
 
 // Database type stubs based on schema
 export interface Database {
@@ -62,10 +64,47 @@ export interface Database {
           email: string;
           full_name: string | null;
           avatar_url: string | null;
-          role: 'super_admin' | 'admin' | 'moderator' | 'editor' | 'user';
+          role: 'super_admin' | 'admin' | 'moderator' | 'editor' | 'author' | 'user';
           created_at: string;
           updated_at: string;
         };
+      };
+      blog_posts: {
+        Row: {
+          id: string;
+          title: string;
+          slug: string;
+          excerpt: string | null;
+          content: string;
+          cover_image: string | null;
+          category: string | null;
+          tags: string[] | null;
+          author_id: string | null;
+          published: boolean;
+          views: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['blog_posts']['Row'], 'id' | 'created_at' | 'updated_at' | 'views'>;
+        Update: Partial<Database['public']['Tables']['blog_posts']['Insert']>;
+      };
+      author_requests: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          full_name: string | null;
+          email: string | null;
+          bio: string | null;
+          reason: string;
+          sample_link: string | null;
+          status: 'pending' | 'approved' | 'rejected';
+          review_notes: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['author_requests']['Row'], 'id' | 'created_at' | 'status' | 'review_notes' | 'reviewed_by' | 'reviewed_at'>;
+        Update: Partial<Database['public']['Tables']['author_requests']['Row']>;
       };
       movie_ratings: {
         Row: {

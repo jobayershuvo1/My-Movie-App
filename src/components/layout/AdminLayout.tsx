@@ -1,22 +1,26 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Film, 
-  Link as LinkIcon, 
-  Users, 
-  Settings, 
-  LogOut, 
-  Download, 
-  Menu, 
+import {
+  LayoutDashboard,
+  Film,
+  Link as LinkIcon,
+  Users,
+  Settings,
+  LogOut,
+  Download,
+  Menu,
   X,
-  Activity
+  Activity,
+  PenLine,
+  UserPlus
 } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
 import ProgressBar from '../ui/ProgressBar';
 
 const SIDERBAR_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
+  { icon: PenLine, label: 'Blog Posts', path: '/admin/posts' },
+  { icon: UserPlus, label: 'Author Requests', path: '/admin/author-requests' },
   { icon: Film, label: 'Movies & Series', path: '/admin/movies' },
   { icon: LinkIcon, label: 'Link Checker', path: '/admin/links' },
   { icon: Download, label: 'Downloads & Requests', path: '/admin/downloads' },
@@ -25,12 +29,21 @@ const SIDERBAR_ITEMS = [
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
 ];
 
+// Movies / Links / Downloads / Logs are for editorial staff, not plain authors
+const STAFF_ONLY_PATHS = ['/admin/movies', '/admin/links', '/admin/downloads', '/admin/logs'];
+
 export default function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   const { signOut, profile } = useAuthStore();
 
   const allowedSidebarItems = SIDERBAR_ITEMS.filter((item) => {
+    if (item.path === '/admin/author-requests') {
+      return ['super_admin', 'admin', 'moderator'].includes(profile?.role || '');
+    }
+    if (STAFF_ONLY_PATHS.includes(item.path)) {
+      return ['super_admin', 'admin', 'moderator', 'editor'].includes(profile?.role || '');
+    }
     if (item.path === '/admin/users') {
       return ['super_admin', 'admin', 'moderator', 'editor'].includes(profile?.role || '');
     }

@@ -247,6 +247,7 @@ export default function Users() {
               <option value="admin">⭐ Admin</option>
               <option value="editor">📝 Editor</option>
               <option value="moderator">🛡️ Moderator</option>
+              <option value="author">✍️ Author</option>
               <option value="user">👤 User</option>
             </select>
           </div>
@@ -310,6 +311,9 @@ export default function Users() {
                               {usr.role === 'editor' && (
                                 <span className="text-xs font-semibold px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-full border border-indigo-500/20">📝 Editor</span>
                               )}
+                              {usr.role === 'author' && (
+                                <span className="text-xs font-semibold px-2.5 py-0.5 bg-sky-500/10 text-sky-400 rounded-full border border-sky-500/20">✍️ Author</span>
+                              )}
                               {usr.role === 'moderator' && (
                                 <span className="text-xs font-semibold px-2.5 py-0.5 bg-purple-500/10 text-purple-400 rounded-full border border-purple-500/20">🛡️ Moderator</span>
                               )}
@@ -331,6 +335,7 @@ export default function Users() {
                               title={!isSuperAdmin ? "Only the Super Admin can alter user roles" : ""}
                             >
                               <option value="user">User</option>
+                              <option value="author">Author</option>
                               <option value="editor">Editor</option>
                               <option value="moderator">Moderator</option>
                               <option value="admin">Admin</option>
@@ -385,6 +390,7 @@ export default function Users() {
                           {usr.role === 'super_admin' && <span className="text-red-400">🔑 Super Admin</span>}
                           {usr.role === 'admin' && <span className="text-amber-400">⭐ Admin</span>}
                           {usr.role === 'editor' && <span className="text-indigo-400 font-mono">📝 Editor</span>}
+                          {usr.role === 'author' && <span className="text-sky-400">✍️ Author</span>}
                           {usr.role === 'moderator' && <span className="text-purple-400">🛡️ Moderator</span>}
                           {usr.role === 'user' && <span className="text-zinc-500">👤 Standard User</span>}
                         </div>
@@ -400,6 +406,7 @@ export default function Users() {
                           title={!isSuperAdmin ? "Only the Super Admin can alter user roles" : ""}
                         >
                           <option value="user">User</option>
+                          <option value="author">Author</option>
                           <option value="editor">Editor</option>
                           <option value="moderator">Moderator</option>
                           <option value="admin">Admin</option>
