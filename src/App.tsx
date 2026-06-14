@@ -13,6 +13,9 @@ import Home from './pages/public/Home';
 import Movies from './pages/public/Movies';
 import Search from './pages/public/Search';
 import Requests from './pages/public/Requests';
+import Blog from './pages/public/Blog';
+import BlogPost from './pages/public/BlogPost';
+import BecomeAuthor from './pages/public/BecomeAuthor';
 import MovieDetail from './pages/public/MovieDetail';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -20,6 +23,8 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import Profile from './pages/public/Profile';
 import Dashboard from './pages/admin/Dashboard';
 import AdminMovies from './pages/admin/Movies';
+import AdminPosts from './pages/admin/Posts';
+import AdminAuthorRequests from './pages/admin/AuthorRequests';
 import AdminLinks from './pages/admin/Links';
 import AdminDownloads from './pages/admin/Downloads';
 import AdminUsers from './pages/admin/Users';
@@ -51,7 +56,9 @@ export default function App() {
     );
   }
 
-  const hasCMSAccess = ['super_admin', 'admin', 'moderator', 'editor'].includes(profile?.role || '');
+  const hasCMSAccess = ['super_admin', 'admin', 'moderator', 'editor', 'author'].includes(profile?.role || '');
+  const isStaff = ['super_admin', 'admin', 'moderator', 'editor'].includes(profile?.role || '');
+  const canReviewAuthors = ['super_admin', 'admin', 'moderator'].includes(profile?.role || '');
 
   return (
     <HelmetProvider>
@@ -63,6 +70,9 @@ export default function App() {
             <Route path="/movies" element={<Movies />} />
             <Route path="/search" element={<Search />} />
             <Route path="/requests" element={<Requests />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route path="/become-author" element={<BecomeAuthor />} />
             <Route path="/movie/:id" element={<MovieDetail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -73,10 +83,12 @@ export default function App() {
           {/* Admin CMS Routes */}
           <Route path="/admin" element={hasCMSAccess ? <AdminLayout /> : <Navigate to="/login" replace />}>
             <Route index element={<Dashboard />} />
-            <Route path="movies" element={<AdminMovies />} />
-            <Route path="links" element={<AdminLinks />} />
-            <Route path="downloads" element={<AdminDownloads />} />
-            <Route path="logs" element={<Logs />} />
+            <Route path="posts" element={<AdminPosts />} />
+            <Route path="author-requests" element={canReviewAuthors ? <AdminAuthorRequests /> : <Navigate to="/admin" replace />} />
+            <Route path="movies" element={isStaff ? <AdminMovies /> : <Navigate to="/admin" replace />} />
+            <Route path="links" element={isStaff ? <AdminLinks /> : <Navigate to="/admin" replace />} />
+            <Route path="downloads" element={isStaff ? <AdminDownloads /> : <Navigate to="/admin" replace />} />
+            <Route path="logs" element={isStaff ? <Logs /> : <Navigate to="/admin" replace />} />
             <Route path="users" element={profile?.role === 'super_admin' ? <AdminUsers /> : <Navigate to="/admin" replace />} />
             <Route path="settings" element={profile?.role === 'super_admin' ? <AdminSettings /> : <Navigate to="/admin" replace />} />
           </Route>
