@@ -340,8 +340,10 @@ async function scrapeFullMovieData(movieName: string): Promise<any> {
     console.warn("Direct trailer scraper failed:", err);
   }
 
+  // No trailer found — leave empty so the UI can hide the trailer section
+  // instead of showing a wrong/placeholder video.
   if (!trailerUrl) {
-    trailerUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+    trailerUrl = "";
   }
 
   return {
@@ -376,9 +378,9 @@ apiRouter.post("/movies/autofill", async (req, res) => {
     // Generate metadata using Gemini Client
     let response;
     try {
-      // Step A: Use gemini-3.1-flash-lite
+      // Step A: Use gemini-2.0-flash-lite
       response = await getAiClient().models.generateContent({
-        model: "gemini-3.1-flash-lite",
+        model: "gemini-2.0-flash-lite",
         contents: `Provide complete and accurate metadata for the movie: "${movieName}".
 You MUST find or generate the absolute real, actual poster image URL and backdrop cover image URL for this movie.
 
@@ -407,11 +409,11 @@ CRITICAL URL RULES:
         }
       });
     } catch (liteErr: any) {
-      console.warn("gemini-3.1-flash-lite failed, falling back to gemini-3.5-flash:", liteErr.message || liteErr);
-      
-      // Step B: Direct fallback to gemini-3.5-flash
+      console.warn("gemini-2.0-flash-lite failed, falling back to gemini-2.0-flash:", liteErr.message || liteErr);
+
+      // Step B: Direct fallback to gemini-2.0-flash
       response = await getAiClient().models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.0-flash",
         contents: `Provide complete and accurate metadata for the movie: "${movieName}".
 You MUST find or generate the absolute real, actual poster image URL and backdrop cover image URL for this movie.
 
