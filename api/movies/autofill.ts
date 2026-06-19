@@ -34,7 +34,7 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: "Please provide a valid movie name." });
   }
 
-  const apiKey = process.env.OMDB_API_KEY;
+  const apiKey = process.env.OMDB_API_KEY?.trim().replace(/^['"]|['"]$/g, "");
   if (!apiKey) {
     return res
       .status(500)
@@ -48,7 +48,16 @@ export default async function handler(req: any, res: any) {
 
     const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!r.ok) {
-      return res.status(502).json({ error: `OMDb request failed (${r.status}).` });
+      const body = await r.text().catch(() => "");
+      if (r.status === 401) {
+        return res.status(401).json({
+          error:
+            "OMDb rejected the API key (401). Activate it via the email link and verify OMDB_API_KEY in Vercel.",
+        });
+      }
+      return res
+        .status(502)
+        .json({ error: `OMDb request failed (${r.status}). ${body.slice(0, 120)}` });
     }
 
     const data: any = await r.json();
