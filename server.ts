@@ -11,10 +11,14 @@ let cachedClient: GoogleGenAI | null = null;
 let cachedKey: string | null = null;
 
 function getAiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  let apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("Server error: Gemini API key is missing. Please add GEMINI_API_KEY to your settings secrets.");
   }
+  
+  // Strip any surrounding whitespace or literal quotes (e.g. from environment file wrapping)
+  apiKey = apiKey.trim().replace(/^['"]|['"]$/g, '');
+
   if (!cachedClient || cachedKey !== apiKey) {
     cachedKey = apiKey;
     cachedClient = new GoogleGenAI({
