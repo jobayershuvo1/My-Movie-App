@@ -1,11 +1,12 @@
 {
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },
     {
-      "source": "/((?!assets/|favicon.ico|.*\\\\.png|.*\\\\.jpg|.*\\\\.svg|.*\\\\.css|.*\\\\.js).*)",
+      "source": "/((?!assets/|favicon\\.ico|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.css|.*\\.js).*)",
       "destination": "/index.html"
     }
   ]
