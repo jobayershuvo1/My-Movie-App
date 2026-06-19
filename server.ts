@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 
@@ -488,8 +487,9 @@ app.use("/api", apiRouter);
 async function startServer() {
   const PORT = 3000;
 
-  // Vite middleware for development
+  // Vite middleware for development (dynamic import — keep vite out of the prod/serverless bundle)
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
