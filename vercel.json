@@ -7,6 +7,10 @@
   },
   "rewrites": [
     {
+      "source": "/api/movies/autofill",
+      "destination": "/api/movies/autofill.ts"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },
