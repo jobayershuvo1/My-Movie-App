@@ -17,6 +17,7 @@ const MovieDetail = lazy(() => import('./pages/public/MovieDetail'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const Profile = lazy(() => import('./pages/public/Profile'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminMovies = lazy(() => import('./pages/admin/Movies'));
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/profile" element={<Profile />} />
             </Route>
 
