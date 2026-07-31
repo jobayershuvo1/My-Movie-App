@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
-import localDbRouter, { uploadsPath } from "./server/sqlite";
+import localDbRouter, { uploadsPath } from "./server/sqlite.js";
 
 dotenv.config({ path: ['.env.local', '.env'] });
 
