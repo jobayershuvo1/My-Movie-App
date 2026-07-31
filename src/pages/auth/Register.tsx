@@ -18,7 +18,7 @@ export default function Register() {
   
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return setError("Supabase is not configured yet.");
+    if (!supabase) return setError("Local database is not available yet.");
     setLoading(true);
     setError(null);
     
@@ -47,12 +47,12 @@ export default function Register() {
           <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Mail className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white mb-2">Check your email</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-white mb-2">Account created</h2>
           <p className="text-sm text-zinc-400">
-            We've sent a verification link to <strong>{email}</strong>. Please check your inbox or spam folder to verify your account.
+            Your local account for <strong>{email}</strong> is ready. No email verification is required.
           </p>
           
-          <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 text-left rounded-xl mt-4 space-y-2">
+          <div className="hidden">
             <h4 className="text-xs font-bold text-yellow-500 font-mono flex items-center gap-1.5 uppercase">
               💡 Developer Sandbox Quick Tip:
             </h4>

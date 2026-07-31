@@ -2,8 +2,10 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import localDbRouter, { uploadsPath } from "./server/sqlite.js";
+import { importLicensedArchiveMovies } from "./server/archive-ingestion.js";
 
-dotenv.config();
+dotenv.config({ path: ['.env.local', '.env'] });
 
 // Initialize server-side Gemini Client with lazy/on-demand loading
 let cachedClient: GoogleGenAI | null = null;
@@ -152,7 +154,9 @@ async function scrapeMovieMedia(movieName: string): Promise<ScrapedMedia> {
 }
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
+app.use('/uploads', express.static(uploadsPath));
+app.use('/api/local-db', localDbRouter);
 
 const apiRouter = express.Router();
 
@@ -169,6 +173,34 @@ apiRouter.get("/analytics", (req, res) => {
     activeUsers: 840,
   });
 });
+
+function authorizeIngestion(req: express.Request, res: express.Response): boolean {
+  const secret = process.env.INGESTION_SECRET;
+  if (!secret && !process.env.VERCEL) return true;
+  if (!secret) {
+    res.status(503).json({ error: 'INGESTION_SECRET is not configured.' });
+    return false;
+  }
+  if (req.headers.authorization !== `Bearer ${secret}`) {
+    res.status(401).json({ error: 'Unauthorized.' });
+    return false;
+  }
+  return true;
+}
+
+async function runLicensedMovieImport(req: express.Request, res: express.Response) {
+  if (!authorizeIngestion(req, res)) return;
+  try {
+    const requestedLimit = Number(req.method === 'GET' ? req.query.limit : req.body?.limit);
+    const result = await importLicensedArchiveMovies(requestedLimit || 3);
+    res.json({ ok: true, source: 'licensed_open_media', ...result });
+  } catch (error: any) {
+    console.error('Licensed movie import failed:', error);
+    res.status(502).json({ ok: false, error: error?.message || 'Movie import failed.' });
+  }
+}
+
+apiRouter.post('/movies/import-licensed', runLicensedMovieImport);
 
 // AI Movie Auto-Fill Endpoint
 async function scrapeFullMovieData(movieName: string): Promise<any> {

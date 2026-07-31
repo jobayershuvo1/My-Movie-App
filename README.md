@@ -11,7 +11,7 @@ A full-stack movie download platform with an admin CMS, AI-powered movie metadat
 | Frontend | React 19, TypeScript, Vite 6, Tailwind CSS 4, React Router 7 |
 | State | Zustand 5 |
 | Backend | Express 4 (Node.js / TypeScript, served via `tsx` in dev) |
-| Database & Auth | Supabase (PostgreSQL + Row Level Security + Realtime) |
+| Database & Auth | SQLite (`better-sqlite3`) + local email/password auth |
 | AI | Google Gemini API (`gemini-2.0-flash`) — movie metadata autofill |
 | Media scraping | TMDB HTML scraping + YouTube trailer extraction |
 | Animation | Framer Motion (`motion`) |
@@ -34,6 +34,10 @@ A full-stack movie download platform with an admin CMS, AI-powered movie metadat
 ---
 
 ## Local Development
+
+SQLite is initialized automatically at `data/cinevault.db`; no Supabase account or keys are needed. The seeded local CMS account is `admin@cinevault.local` with password `admin123`. The `data/` directory is ignored by Git.
+
+For a custom super-admin, set `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` as server-side environment secrets. On Vercel, SQLite uses `/tmp` and is therefore demo-only: writes can disappear when a function instance is replaced.
 
 **Prerequisites:** Node.js 18+
 

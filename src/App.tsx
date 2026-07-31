@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, lazy, Suspense } from 'react';
 import { useAuthStore } from './store/auth';
-import { isSupabaseConfigured } from './lib/supabase';
 import { HelmetProvider } from 'react-helmet-async';
 
 // Layouts
@@ -26,7 +25,6 @@ const AdminDownloads = lazy(() => import('./pages/admin/Downloads'));
 const AdminUsers = lazy(() => import('./pages/admin/Users'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const Logs = lazy(() => import('./pages/admin/Logs'));
-const SetupGuide = lazy(() => import('./pages/SetupGuide'));
 
 function PageLoader() {
   return (
@@ -40,18 +38,8 @@ export default function App() {
   const { initialize, isLoading, profile } = useAuthStore();
 
   useEffect(() => {
-    if (isSupabaseConfigured) {
-      initialize();
-    }
+    initialize();
   }, [initialize]);
-
-  if (!isSupabaseConfigured) {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <SetupGuide />
-      </Suspense>
-    );
-  }
 
   if (isLoading) {
     return (

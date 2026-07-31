@@ -2,6 +2,26 @@
 
 This guide covers deploying the CineVault Full Stack Application.
 
+## Optional manual licensed movie imports
+
+Automatic imports are disabled. An administrator can explicitly call the manual
+import endpoint when needed. The importer checks Wikimedia Commons first and Internet Archive as a fallback.
+It only accepts items carrying verifiable Creative Commons or public-domain
+metadata, selects a full-length video, checks that the file responds, and then
+creates the movie and its direct download link together.
+
+Set a long random `INGESTION_SECRET` in Vercel for Production. For a manual local run:
+
+```bash
+curl -X POST http://localhost:3000/api/movies/import-licensed \
+  -H "Content-Type: application/json" \
+  -d '{"limit": 3}'
+```
+
+Vercel's `/tmp` SQLite database is ephemeral. For a durable production catalog,
+connect a persistent SQLite-compatible database such as Turso before relying on
+imports for long-term storage.
+
 ## Architecture
 - **Frontend**: React, Vite, Tailwind CSS
 - **Backend**: Express containerized OR Vercel Serverless (using `vercel.json`)
