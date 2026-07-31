@@ -175,10 +175,10 @@ apiRouter.get("/analytics", (req, res) => {
 });
 
 function authorizeIngestion(req: express.Request, res: express.Response): boolean {
-  const secret = process.env.CRON_SECRET || process.env.INGESTION_SECRET;
+  const secret = process.env.INGESTION_SECRET;
   if (!secret && !process.env.VERCEL) return true;
   if (!secret) {
-    res.status(503).json({ error: 'CRON_SECRET is not configured.' });
+    res.status(503).json({ error: 'INGESTION_SECRET is not configured.' });
     return false;
   }
   if (req.headers.authorization !== `Bearer ${secret}`) {
@@ -200,7 +200,6 @@ async function runLicensedMovieImport(req: express.Request, res: express.Respons
   }
 }
 
-apiRouter.get('/cron/import-movies', runLicensedMovieImport);
 apiRouter.post('/movies/import-licensed', runLicensedMovieImport);
 
 // AI Movie Auto-Fill Endpoint

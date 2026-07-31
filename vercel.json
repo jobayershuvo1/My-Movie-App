@@ -5,12 +5,6 @@
       "maxDuration": 60
     }
   },
-  "crons": [
-    {
-      "path": "/api/cron/import-movies?limit=3",
-      "schedule": "15 2 * * *"
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/movies/autofill",
