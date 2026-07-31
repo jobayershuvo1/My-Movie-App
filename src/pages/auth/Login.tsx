@@ -16,7 +16,7 @@ export default function Login() {
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return setError("Supabase is not configured yet.");
+    if (!supabase) return setError("Local database is not available yet.");
     setLoading(true);
     setError(null);
     
@@ -48,6 +48,10 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4 glass p-6 rounded-2xl">
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+            <p className="font-semibold">Local admin account</p>
+            <p className="mt-1 font-mono">admin@cinevault.local / admin123</p>
+          </div>
           {error && (
             <div className="space-y-3">
               <div className="p-3 text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg">

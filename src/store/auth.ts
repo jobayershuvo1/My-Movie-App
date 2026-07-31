@@ -1,6 +1,17 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { User, Session } from '@supabase/supabase-js';
+
+interface User {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+  created_at?: string;
+}
+
+interface Session {
+  user: User;
+  access_token?: string;
+}
 
 export type UserRole = 'super_admin' | 'admin' | 'moderator' | 'editor' | 'user';
 

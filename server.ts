@@ -2,8 +2,9 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import localDbRouter, { uploadsPath } from "./server/sqlite";
 
-dotenv.config();
+dotenv.config({ path: ['.env.local', '.env'] });
 
 // Initialize server-side Gemini Client with lazy/on-demand loading
 let cachedClient: GoogleGenAI | null = null;
@@ -152,7 +153,9 @@ async function scrapeMovieMedia(movieName: string): Promise<ScrapedMedia> {
 }
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
+app.use('/uploads', express.static(uploadsPath));
+app.use('/api/local-db', localDbRouter);
 
 const apiRouter = express.Router();
 
