@@ -18,7 +18,7 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 export const sqlitePath = path.join(dataDir, 'cinevault.db');
 export const uploadsPath = uploadsDir;
 
-const db = new Database(sqlitePath);
+export const db = new Database(sqlitePath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 

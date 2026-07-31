@@ -3,6 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import localDbRouter, { uploadsPath } from "./server/sqlite.js";
+import { importLicensedArchiveMovies } from "./server/archive-ingestion.js";
 
 dotenv.config({ path: ['.env.local', '.env'] });
 
@@ -172,6 +173,35 @@ apiRouter.get("/analytics", (req, res) => {
     activeUsers: 840,
   });
 });
+
+function authorizeIngestion(req: express.Request, res: express.Response): boolean {
+  const secret = process.env.CRON_SECRET || process.env.INGESTION_SECRET;
+  if (!secret && !process.env.VERCEL) return true;
+  if (!secret) {
+    res.status(503).json({ error: 'CRON_SECRET is not configured.' });
+    return false;
+  }
+  if (req.headers.authorization !== `Bearer ${secret}`) {
+    res.status(401).json({ error: 'Unauthorized.' });
+    return false;
+  }
+  return true;
+}
+
+async function runLicensedMovieImport(req: express.Request, res: express.Response) {
+  if (!authorizeIngestion(req, res)) return;
+  try {
+    const requestedLimit = Number(req.method === 'GET' ? req.query.limit : req.body?.limit);
+    const result = await importLicensedArchiveMovies(requestedLimit || 3);
+    res.json({ ok: true, source: 'licensed_open_media', ...result });
+  } catch (error: any) {
+    console.error('Licensed movie import failed:', error);
+    res.status(502).json({ ok: false, error: error?.message || 'Movie import failed.' });
+  }
+}
+
+apiRouter.get('/cron/import-movies', runLicensedMovieImport);
+apiRouter.post('/movies/import-licensed', runLicensedMovieImport);
 
 // AI Movie Auto-Fill Endpoint
 async function scrapeFullMovieData(movieName: string): Promise<any> {
